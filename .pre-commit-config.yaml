@@ -1,0 +1,45 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # Use local project tools to avoid monorepo path/working-dir edge cases.
+  # These hooks assume you have:
+  # - Python deps installed (including ruff + pre-commit) for apps/api
+  # - Node deps installed for apps/web (pnpm install)
+  - repo: local
+    hooks:
+      # Format checks (fastest - just formatting)
+      - id: ruff-format
+        name: ruff (format)
+        entry: python -m ruff format apps/api
+        language: system
+        pass_filenames: false
+
+      - id: biome
+        name: biome (format+lint)
+        entry: pnpm -C apps/web format
+        language: system
+        pass_filenames: false
+
+      # Lint checks (fast - code style/patterns)
+      - id: ruff-check
+        name: ruff (lint)
+        entry: python -m ruff check apps/api
+        language: system
+        pass_filenames: false
+
+      # Type checking (medium - static analysis)
+      - id: typescript-check
+        name: typescript (typecheck)
+        entry: pnpm -C apps/web typecheck
+        language: system
+        pass_filenames: false

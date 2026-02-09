@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: apps-api
+Version: 0.0.0
+Summary: FastAPI + SQLModel API scaffold for the fullstack template
+Requires-Python: >=3.12
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: sqlmodel>=0.0.22
+Requires-Dist: psycopg[binary]>=3.2
+Requires-Dist: alembic>=1.13
+Requires-Dist: python-jose[cryptography]>=3.3
+Requires-Dist: passlib[bcrypt]>=1.7.4
+Requires-Dist: bcrypt<4.1,>=4.0
+Requires-Dist: jinja2>=3.1
+Requires-Dist: mjml
+Requires-Dist: pydantic-settings>=2.5
+Requires-Dist: boto3>=1.35
+Requires-Dist: pre-commit>=4.5.1
+Requires-Dist: ruff>=0.14.14
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-cov>=6.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24; extra == "dev"
+Requires-Dist: httpx>=0.27; extra == "dev"
+Requires-Dist: ruff>=0.8; extra == "dev"
+Requires-Dist: pre-commit>=3.7; extra == "dev"

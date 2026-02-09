@@ -1,0 +1,27 @@
+# Node
+node_modules/
+.next/
+dist/
+out/
+.turbo/
+.pnpm-store/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+
+# Local env (we keep templates in config/)
+.env
+.env.local
+.env.*.local
+.env.production

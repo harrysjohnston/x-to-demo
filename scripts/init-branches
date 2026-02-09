@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/init-branches [options] [branch ...]
+
+Creates git branches from the current branch (e.g. main). Default: development.
+
+Examples:
+  ./scripts/init-branches
+  ./scripts/init-branches development staging
+  ./scripts/init-branches --dry-run
+
+Options:
+  --dry-run   Show branches that would be created
+  -h, --help  Show this help
+EOF
+}
+
+DRY_RUN=false
+BRANCHES=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+    *)
+      BRANCHES+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#BRANCHES[@]} -eq 0 ]]; then
+  BRANCHES=(development)
+fi
+
+log() {
+  printf "==> %s\n" "$1"
+}
+
+warn() {
+  printf "warning: %s\n" "$1" >&2
+}
+
+cd "$ROOT_DIR"
+
+if [[ ! -d ".git" ]]; then
+  echo "Not a git repository." >&2
+  exit 1
+fi
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+require_cmd git
+
+current="$(git branch --show-current)"
+if [[ -z "$current" ]]; then
+  echo "Cannot determine current branch (detached HEAD?)." >&2
+  exit 1
+fi
+
+for branch in "${BRANCHES[@]}"; do
+  if git show-ref --quiet "refs/heads/$branch"; then
+    warn "Branch '$branch' already exists; skipping"
+    continue
+  fi
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "Would create branch '$branch' from $current"
+  else
+    log "Creating branch '$branch' from $current"
+    git branch "$branch"
+  fi
+done
