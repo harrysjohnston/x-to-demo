@@ -166,7 +166,7 @@ flowchart TB
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `project_name` | `fullstack-template` | Resource naming prefix |
+| `project_name` | `x-to-demo` | Resource naming prefix |
 | `aws_region` | `us-east-1` | AWS region |
 | `vpc_cidr` | `10.0.0.0/16` | VPC CIDR block |
 | `enable_https` | `false` | Enable HTTPS (requires `certificate_arn`) |
@@ -229,11 +229,11 @@ After pushing new images to GHCR:
 
 ```bash
 # Update ECS services to pull latest images
-aws ecs update-service --cluster fullstack-template-dev-cluster \
-  --service fullstack-template-dev-api --force-new-deployment
+aws ecs update-service --cluster x-to-demo-dev-cluster \
+  --service x-to-demo-dev-api --force-new-deployment
 
-aws ecs update-service --cluster fullstack-template-dev-cluster \
-  --service fullstack-template-dev-web --force-new-deployment
+aws ecs update-service --cluster x-to-demo-dev-cluster \
+  --service x-to-demo-dev-web --force-new-deployment
 ```
 
 ### Running Migrations
@@ -241,8 +241,8 @@ aws ecs update-service --cluster fullstack-template-dev-cluster \
 ```bash
 # Run migration as a one-off ECS task
 aws ecs run-task \
-  --cluster fullstack-template-dev-cluster \
-  --task-definition fullstack-template-dev-api \
+  --cluster x-to-demo-dev-cluster \
+  --task-definition x-to-demo-dev-api \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx]}" \
   --overrides '{"containerOverrides":[{"name":"api","command":["python","scripts/migrate.py","upgrade"]}]}'

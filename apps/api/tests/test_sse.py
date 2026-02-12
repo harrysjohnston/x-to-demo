@@ -8,6 +8,7 @@ import pytest
 
 from app.pubsub import pubsub
 from app.routers.auth import SSE_COOKIE_NAME
+from app.routers.sse import format_sse_event
 from app.schemas import SSEEvent
 
 if TYPE_CHECKING:
@@ -110,6 +111,16 @@ class TestSSEStatus:
         data = resp.json()
         assert "subscribers" in data
         assert isinstance(data["subscribers"], int)
+
+
+class TestSSEFormatting:
+    def test_format_sse_event_json_encodes_data(self):
+        event = SSEEvent(event="test", data={"authenticated": True, "count": 2})
+        formatted = format_sse_event(event)
+
+        assert "event: test" in formatted
+        assert '"authenticated": true' in formatted
+        assert '"count": 2' in formatted
 
 
 class TestPubSubManager:

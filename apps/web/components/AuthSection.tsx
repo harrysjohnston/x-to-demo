@@ -2,24 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AuthForm } from "@/components/AuthForm";
-import { FileGallery } from "@/components/FileGallery";
-import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
+import { XToDemoStudio } from "@/components/XToDemoStudio";
 import { isAuthenticated, logout } from "@/lib/auth";
-
-interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  objectKey: string;
-  uploadedAt: Date;
-}
 
 export function AuthSection() {
   const [authenticated, setAuthenticated] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   useEffect(() => {
     setAuthenticated(isAuthenticated());
@@ -29,15 +18,6 @@ export function AuthSection() {
   const handleLogout = useCallback(async () => {
     await logout();
     setAuthenticated(false);
-    setUploadedFiles([]);
-  }, []);
-
-  const handleUploadSuccess = useCallback((file: UploadedFile) => {
-    setUploadedFiles((prev) => [file, ...prev]);
-  }, []);
-
-  const handleDeleteFile = useCallback((id: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
   if (!mounted) {
@@ -58,7 +38,7 @@ export function AuthSection() {
   }
 
   return (
-    <div className="w-full max-w-2xl space-y-8">
+    <div className="w-full max-w-6xl space-y-8">
       {/* User bar */}
       <div className="flex items-center justify-between gap-4 animate-fade-in">
         <div className="flex items-center gap-3">
@@ -91,15 +71,7 @@ export function AuthSection() {
         </Button>
       </div>
 
-      {/* Upload section */}
-      <FileUpload onUploadSuccess={handleUploadSuccess} />
-
-      {/* File gallery */}
-      {uploadedFiles.length > 0 && (
-        <div className="animate-fade-up">
-          <FileGallery files={uploadedFiles} onDelete={handleDeleteFile} />
-        </div>
-      )}
+      <XToDemoStudio />
     </div>
   );
 }

@@ -154,7 +154,7 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com/api/v1
 Create `docker-compose.prod.yml`:
 
 ```yaml
-name: fullstack-template-production
+name: x-to-demo-production
 
 services:
   api:

@@ -1,9 +1,72 @@
+import logging
+
+import colorlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import setup_exception_handlers
-from app.routers import auth, sse, uploads, users
+from app.routers import auth, sse, uploads, users, x_to_demo
+
+_LOG_STANDARD = {
+    "name",
+    "msg",
+    "args",
+    "asctime",
+    "created",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "module",
+    "msecs",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "exc_info",
+    "exc_text",
+    "message",
+    "thread",
+    "threadName",
+    "taskName",
+}
+
+
+class _ColoredExtraFormatter(colorlog.ColoredFormatter):
+    def format(self, record: logging.LogRecord) -> str:
+        base = super().format(record)
+        extras = {k: v for k, v in record.__dict__.items() if k not in _LOG_STANDARD}
+        if not extras:
+            return base
+        parts = [f"{k}={v}" for k, v in sorted(extras.items())]
+        return f"{base} {', '.join(parts)}"
+
+
+_log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+_log_format = "%(log_color)s%(asctime)s %(levelname)-8s%(reset)s %(name)s: %(message)s"
+_formatter = _ColoredExtraFormatter(_log_format, log_colors=colorlog.default_log_colors)
+logging.basicConfig(level=_log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+root = logging.getLogger()
+root.setLevel(_log_level)
+for h in root.handlers:
+    h.setFormatter(_formatter)
+
+
+class _SSEEndpointFilter(logging.Filter):
+    """Filter out access logs for GET /api/v1/sse/events to avoid log spam from long-lived SSE connections."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn.access logs (client_addr, method, full_path, http_version, status_code) in record.args
+        if not getattr(record, "args", None) or len(record.args) < 5:
+            return True
+        path = record.args[2] if isinstance(record.args[2], str) else ""
+        return "/sse/events" not in path
+
+
+logging.getLogger("uvicorn.access").addFilter(_SSEEndpointFilter())
 
 app = FastAPI(
     title=settings.app_name,
@@ -31,6 +94,7 @@ app.include_router(users.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(sse.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")
+app.include_router(x_to_demo.router, prefix="/api/v1")
 
 
 @app.get("/health")

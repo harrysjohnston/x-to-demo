@@ -70,7 +70,7 @@ jobs:
           file: apps/api/Dockerfile
           target: production
           push: false
-          tags: fullstack-template-api:test
+          tags: x-to-demo-api:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -81,7 +81,7 @@ jobs:
           file: apps/web/Dockerfile
           target: production
           push: false
-          tags: fullstack-template-web:test
+          tags: x-to-demo-web:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -90,7 +90,7 @@ jobs:
           docker run -d --name api-test -p 8000:8000 \
             -e DATABASE_URL=sqlite:///./test.db \
             -e JWT_SECRET=test-secret \
-            fullstack-template-api:test
+            x-to-demo-api:test
           sleep 10
           curl -f http://localhost:8000/health || exit 1
           docker logs api-test
@@ -100,7 +100,7 @@ jobs:
         run: |
           docker run -d --name web-test -p 3000:3000 \
             -e NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 \
-            fullstack-template-web:test
+            x-to-demo-web:test
           sleep 15
           # Check that the container is still running (didn't crash)
           docker ps | grep web-test || exit 1

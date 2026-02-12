@@ -33,7 +33,7 @@ repos:
       # Lint checks (fast - code style/patterns)
       - id: ruff-check
         name: ruff (lint)
-        entry: python -m ruff check apps/api
+        entry: python -m ruff check apps/api --fix
         language: system
         pass_filenames: false
 

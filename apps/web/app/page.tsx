@@ -5,22 +5,23 @@ export default function HomePage() {
     <main className="min-h-screen gradient-mesh">
       {/* Asymmetric layout - content offset to the left with generous right margin */}
       <div className="min-h-screen flex items-center px-6 py-16 lg:px-16">
-        <div className="w-full max-w-xl lg:ml-[8%]">
+        <div className="w-full max-w-6xl lg:ml-[4%]">
           {/* Decorative element */}
           <div className="animate-fade-up mb-8">
             <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
               <span className="w-8 h-px bg-primary/60" />
-              <span>Secure file storage</span>
+              <span>X-to-demo pipeline</span>
             </div>
           </div>
 
           {/* Main heading */}
-          <h1 className="animate-fade-up stagger-1 text-4xl md:text-5xl lg:text-6xl font-display font-semibold tracking-tight leading-[1.1] mb-6">
-            Your files, <span className="text-primary">archived</span>
+          <h1 className="animate-fade-up stagger-1 text-4xl md:text-5xl lg:text-6xl font-display font-semibold tracking-tight leading-[1.06] mb-6 max-w-4xl">
+            Turn <span className="text-primary">input X</span> into a runnable demo code spec
           </h1>
 
-          <p className="animate-fade-up stagger-2 text-lg text-muted-foreground max-w-md mb-12 leading-relaxed">
-            A minimal, secure space for your uploads. Sign in to start building your collection.
+          <p className="animate-fade-up stagger-2 text-lg text-muted-foreground max-w-3xl mb-12 leading-relaxed">
+            Upload or paste brainstorming input, run the multi-stage pipeline, and produce a saved
+            code spec aligned to the master plan and sub-plans.
           </p>
 
           {/* Auth section with staggered animation */}

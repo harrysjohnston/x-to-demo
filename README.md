@@ -1,156 +1,148 @@
-# Fullstack Template
+# x-to-demo
 
-A **fullstack template** to bootstrap a production-ready app: Next.js frontend, FastAPI backend, PostgreSQL, auth, file uploads, realtime (SSE), and email. Use it as a starting point and customize from there.
+`x-to-demo` turns raw Input X into a runnable-demo code spec via a three-phase, opinionated pipeline.
 
-## Quick start
+## What It Does
 
-1. **Clone and bootstrap** (renames the template, installs deps, optional Docker):
+- Accepts raw Input X from the web app (notes, docs, tickets, emails, transcripts, and similar text input).
+- Runs a chained LLM pipeline (Responses API) across three major phases:
+- Phase 1: Input -> SDD Feature Spec
+- Phase 2: Feature Spec -> Demo Spec
+- Phase 3: Demo Spec -> Code Spec
+- Returns all phase artifacts in the UI.
+- Saves phase markdown outputs and the final code spec to disk.
 
-   ```bash
-   git clone <this-repo> your-project && cd your-project
-   ./scripts/bootstrap --project-name your-project
-   ```
+## Quick Start
 
-2. **Run the stack** (from repo root):
-
-   ```bash
-   cp config/env.example .env   # if bootstrap didn't create it
-   pnpm dev:full                # api + web + db + MinIO + MailHog
-   ```
-
-3. Open **http://localhost:3000** (web) and **http://localhost:8000/docs** (API).
-
-For a non-interactive run, pass `--project-name your-app`. If Docker isn't available, use `--skip-compose` and run Postgres (and optionally MinIO/MailHog) locally. See [Local development](#local-development) below.
-
-## What’s included
-
-| Layer      | Tech |
-|-----------|------|
-| **Web**   | Next.js, TypeScript, shadcn/ui, Tailwind |
-| **API**   | FastAPI, SQLModel, JWT auth, REST |
-| **DB**    | PostgreSQL, Alembic migrations |
-| **Realtime** | Server-Sent Events (SSE) |
-| **Uploads** | Presigned URLs (S3; GCS/Azure adapters) |
-| **Email** | Jinja2 + MJML templates, dev sink (MailHog) |
-| **Testing** | Vitest (web unit), Pytest (API), Playwright (e2e) |
-| **Tooling** | Biome (JS/TS), Ruff (Python), pre-commit |
-| **Dev**   | Docker Compose (db, MinIO, MailHog profiles) |
-| **CI/CD** | GitHub Actions (lint, test, deploy) |
-
-## Repo layout
-
-```
-.
-├── apps/
-│   ├── web/          # Next.js + TypeScript + shadcn/ui
-│   └── api/          # FastAPI + SQLModel
-├── packages/         # Optional shared packages (types, utils)
-├── infra/            # Terraform (AWS), deployment notes
-├── .github/workflows/  # CI/CD
-├── config/           # env.example, template checklist
-├── docs/             # Deployment runbook
-├── docker-compose.yml
-├── architecture_decisions.md   # Design notes and tradeoffs
-└── scripts/          # bootstrap, configure-deploy, rename-template
-```
-
-## Using this as a template
-
-After cloning, run the bootstrap script so the repo is renamed and ready for your project:
-
-```bash
-./scripts/bootstrap --project-name your-project-name
-```
-
-- **Already renamed?** Use `--skip-rename`.
-- **No Docker?** Use `--skip-compose` and run services yourself.
-- **Python issues?** Activate the venv: `source .venv/bin/activate` (bootstrap creates `.venv` when needed).
-
-Post-bootstrap, work through **config/template-checklist.md** to set project name, JWT issuer/audience, email sender, domains, and Terraform/CI variables.
-
-## Local development
-
-### Env file
+1. Copy environment config.
 
 ```bash
 cp config/env.example .env
 ```
 
-- `DATABASE_URL` is optional when using Compose; the default points at the `db` service.
-- For the storage profile, set `S3_ENDPOINT_URL=http://minio:9000` (Compose) or `http://localhost:9000` (local MinIO).
-
-### Dev commands (from repo root)
-
-| Command | Services |
-|---------|----------|
-| `pnpm dev` | api, web |
-| `pnpm dev:db` | api, web, db |
-| `pnpm dev:full` | api, web, db, MinIO, MailHog |
-| `pnpm dev:down` | stop all |
-
-### Database migrations
-
-Migrations run automatically via Docker Compose when the `db` profile is active. The `migrate` service waits for Postgres to be healthy, applies pending migrations, then exits. The API waits for migrations to complete before starting.
-
-To run migrations manually (e.g., when not using Docker):
+2. Set your OpenAI key in `.env`.
 
 ```bash
-source .venv/bin/activate
-python apps/api/scripts/migrate.py upgrade --no-backup-check
+OPENAI_API_KEY=<your-key>
 ```
 
-For production deployments, omit `--no-backup-check` to require backup confirmation before applying migrations.
-
-### URLs
-
-- Web: http://localhost:3000
-- API docs: http://localhost:8000/docs
-- API health: http://localhost:8000/health
-- MailHog (email): http://localhost:8025
-- MinIO console (uploads): http://localhost:9001
-
-## Testing
+3. Start the stack.
 
 ```bash
-# All tests (web unit + e2e, API)
-pnpm test:full
+pnpm dev:full
+```
 
-# Web only
+4. Open:
+- Web: `http://localhost:3000`
+- API docs: `http://localhost:8000/docs`
+
+## Using The Product
+
+1. Register or sign in on the landing page.
+2. Upload an Input X file or paste raw Input X text into the `Input X` panel.
+3. Optionally provide:
+- `Feature name hint`
+- `Additional context`
+4. Click `Run pipeline`.
+5. Review phase artifacts and copy the final code spec.
+6. Find saved artifacts under `artifacts/x-to-demo/<run-id>/` (or your configured output dir).
+
+## API Endpoint
+
+`POST /api/v1/x-to-demo/runs` (auth required)
+
+Request body:
+
+```json
+{
+  "x_input": "Raw Input X text...",
+  "additional_context": "Optional constraints/context",
+  "feature_name_hint": "Optional feature label",
+  "model": "gpt-5.2",
+  "reasoning_effort": "high"
+}
+```
+
+Response (enveloped):
+
+- `run_id`
+- `created_at`
+- `model`
+- `reasoning_effort`
+- `artifacts[]` (`phase_key`, `title`, `markdown`, `saved_path`)
+- `final_code_spec`
+- `final_code_spec_path`
+
+## Artifact Persistence
+
+Default location:
+
+`artifacts/x-to-demo/<run-id>/`
+
+Typical files:
+
+- `01-phase-1-input-to-feature-spec.md`
+- `02-phase-2-feature-spec-to-demo-spec.md`
+- `03-phase-3-demo-spec-to-code-spec.md`
+- `run-manifest.json`
+
+Note: phase order is defined by artifact ordering and titles.
+
+Configure output path with `X_TO_DEMO_OUTPUT_DIR`.
+
+## Project Structure
+
+```text
+apps/web/                  # Next.js frontend (auth + pipeline workspace UI)
+apps/api/                  # FastAPI backend (auth, pipeline endpoint, persistence)
+apps/api/app/services/     # X-to-Demo pipeline orchestration service
+.plans/                    # Master plan + sub-plans
+.plans/milestones/         # Milestone trackers for plan execution
+config/env.example         # Environment variable template
+```
+
+## Environment Variables (Pipeline)
+
+- `OPENAI_API_KEY` (required)
+- `X_TO_DEMO_MODEL` (default: `gpt-5.1`; supported: `gpt-5.2`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1-nano`)
+- `X_TO_DEMO_OUTPUT_DIR` (default: `artifacts/x-to-demo`)
+- `X_TO_DEMO_STORE_RESPONSES` (default: `false`)
+- `X_TO_DEMO_MAX_INPUT_CHARS` (default: `60000`)
+- Per-run `reasoning_effort` (optional): for `gpt-5.2` use `none|low|medium|high|xhigh`; for other GPT-5 models use `minimal|low|medium|high`
+
+## Local Development Commands
+
+- `pnpm dev` -> web + api
+- `pnpm dev:db` -> web + api + db
+- `pnpm dev:full` -> web + api + db + storage + MailHog
+- `pnpm dev:down` -> stop all dev services
+
+## Tests And Lint
+
+```bash
+# Web
+pnpm -C apps/web lint
+pnpm -C apps/web typecheck
 pnpm -C apps/web test
-pnpm -C apps/web e2e
 
-# API only (from repo root; activate venv first)
-source .venv/bin/activate
-python -m pytest -q -c apps/api/pyproject.toml apps/api
-
-# Lint
-pnpm lint
+# API
+uv run ruff check apps/api/app apps/api/tests
+uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 ```
 
-## Production builds
+## Current Prototype Constraints
 
-Images are built on push to `main` via GitHub Actions. To build locally:
+- Input X currently optimized for text-like raw inputs.
+- One pipeline run produces one code spec artifact set.
+- Pipeline is synchronous per request.
+- Output is designed for demo-build handoff, not production architecture.
 
-```bash
-pnpm build:prod
-# Or individually:
-docker build -f apps/api/Dockerfile --target production -t fullstack-api:prod .
-docker build -f apps/web/Dockerfile --target production -t fullstack-web:prod .
-```
+## Related Docs
 
-See **docs/deployment.md** for runbooks, migrations, and AWS/CI/CD.
+- Master plan: `/.plans/x-to-demo-master-plan.md`
+- Pipeline simplification plan: `/.plans/x-to-demo-pipeline-simplification.md`
+- Output contracts: `/.plans/x-to-demo-output-contracts.md`
+- Deployment: `/docs/deployment.md`
+- Architecture notes: `/architecture_decisions.md`
 
-## Pre-commit hooks
-
-After installing dependencies, enable hooks so Ruff and Biome run before each commit:
-
-```bash
-source .venv/bin/activate
-uv pip install -e "apps/api[dev]"
-pre-commit install
-pre-commit run --all-files
-```
-
-## Architecture and decisions
-
-**architecture_decisions.md** documents design choices, alternatives, and tradeoffs for this template.
+Last reviewed: 2026-02-12

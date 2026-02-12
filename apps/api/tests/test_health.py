@@ -20,7 +20,7 @@ def test_health_endpoint_content_type(client) -> None:
 
 def test_app_metadata() -> None:
     """Test that the FastAPI app has correct metadata."""
-    assert app.title == "fullstack-template API"
+    assert app.title == "x-to-demo API"
     assert app.version == "0.0.0"
     assert app.description is not None
 
@@ -32,7 +32,7 @@ def test_openapi_docs_available(client) -> None:
     openapi_schema = response.json()
     assert "openapi" in openapi_schema
     assert "info" in openapi_schema
-    assert openapi_schema["info"]["title"] == "fullstack-template API"
+    assert openapi_schema["info"]["title"] == "x-to-demo API"
 
 
 def test_docs_ui_available(client) -> None:

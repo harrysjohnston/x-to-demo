@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -70,7 +71,7 @@ def format_sse_event(event: SSEEvent) -> str:
         lines.append(f"id: {event.id}")
     lines.append(f"event: {event.event}")
     # Data must be JSON-encoded and can span multiple lines
-    lines.append(f"data: {event.data}")
+    lines.append(f"data: {json.dumps(event.data, default=str)}")
     lines.append("")  # Empty line to end the event
     return "\n".join(lines) + "\n"
 

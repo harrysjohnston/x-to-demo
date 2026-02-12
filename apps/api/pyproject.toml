@@ -16,6 +16,8 @@ dependencies = [
   "mjml",
   "pydantic-settings>=2.5",
   "boto3>=1.35",
+  "openai>=1.109.0",
+  "colorlog>=6.8",
   "pre-commit>=4.5.1",
   "ruff>=0.14.14",
 ]

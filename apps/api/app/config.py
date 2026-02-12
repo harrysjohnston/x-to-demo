@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     )
 
     # Application metadata
-    app_name: str = Field(default="fullstack-template API", description="Application name")
+    app_name: str = Field(default="x-to-demo API", description="Application name")
     app_version: str = Field(default="0.0.0", description="Application version")
     app_description: str = Field(
         default="FastAPI + SQLModel API scaffold for the fullstack template",
@@ -67,11 +67,11 @@ class Settings(BaseSettings):
         description="JWT signing secret (MUST be changed in production)",
     )
     jwt_issuer: str = Field(
-        default="fullstack-template",
+        default="x-to-demo",
         description="JWT issuer claim",
     )
     jwt_audience: str = Field(
-        default="fullstack-template",
+        default="x-to-demo",
         description="JWT audience claim",
     )
     jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm")
@@ -117,7 +117,7 @@ class Settings(BaseSettings):
         description="Default from address for emails",
     )
     email_from_name: str = Field(
-        default="Fullstack Template",
+        default="x-to-demo",
         description="Default from name for emails",
     )
     email_web_base_url: str = Field(
@@ -159,6 +159,38 @@ class Settings(BaseSettings):
     upload_url_expires_seconds: int = Field(
         default=900,
         description="Presigned URL expiration time in seconds (default: 15 minutes)",
+    )
+
+    # OpenAI / X-to-Demo pipeline
+    openai_api_key: str | None = Field(
+        default=None,
+        description="OpenAI API key used for X-to-Demo LLM pipeline execution",
+    )
+    x_to_demo_model: str = Field(
+        default="gpt-5.1",
+        description=(
+            "Default OpenAI model used for X-to-Demo pipeline phases "
+            "(supported: gpt-5.2, gpt-5.1, gpt-5-mini, gpt-5-nano, gpt-4.1-nano)"
+        ),
+    )
+    x_to_demo_output_dir: str = Field(
+        default="artifacts/x-to-demo",
+        description="Directory where generated X-to-Demo artifacts are saved",
+    )
+    x_to_demo_store_responses: bool = Field(
+        default=False,
+        description="Whether Responses API outputs should be stored by OpenAI",
+    )
+    x_to_demo_max_input_chars: int = Field(
+        default=60000,
+        description="Maximum allowed Input X length in characters",
+    )
+    x_to_demo_response_wait_log_interval_seconds: float = Field(
+        default=15.0,
+        description=(
+            "Seconds between progress logs while awaiting a Responses API call "
+            "during X-to-Demo phases"
+        ),
     )
 
     @property

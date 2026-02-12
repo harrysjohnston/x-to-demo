@@ -10,14 +10,13 @@ describe("HomePage", () => {
 
   it("displays the app title", () => {
     render(<HomePage />);
-    // Title is split across elements: "Your files, " and "archived"
-    expect(screen.getByText("Your files,")).toBeInTheDocument();
-    expect(screen.getByText("archived")).toBeInTheDocument();
+    expect(screen.getByText("input X")).toBeInTheDocument();
+    expect(screen.getByText(/runnable demo code spec/i)).toBeInTheDocument();
   });
 
   it("displays the description text", () => {
     render(<HomePage />);
-    expect(screen.getByText(/A minimal, secure space for your uploads/i)).toBeInTheDocument();
+    expect(screen.getByText(/Upload or paste brainstorming input/i)).toBeInTheDocument();
   });
 
   it("renders the auth buttons", () => {

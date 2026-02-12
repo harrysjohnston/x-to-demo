@@ -1,4 +1,4 @@
-name: fullstack-template
+name: x-to-demo
 
 services:
   migrate:

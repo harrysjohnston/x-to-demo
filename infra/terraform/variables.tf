@@ -5,7 +5,7 @@
 variable "project_name" {
   description = "Name of the project (used for resource naming)"
   type        = string
-  default     = "fullstack-template"
+  default     = "x-to-demo"
 }
 
 variable "aws_region" {
@@ -59,13 +59,13 @@ variable "db_password" {
 variable "api_image" {
   description = "Docker image for the API service"
   type        = string
-  default     = "ghcr.io/OWNER/fullstack-template-api:latest"
+  default     = "ghcr.io/OWNER/x-to-demo-api:latest"
 }
 
 variable "web_image" {
   description = "Docker image for the Web service"
   type        = string
-  default     = "ghcr.io/OWNER/fullstack-template-web:latest"
+  default     = "ghcr.io/OWNER/x-to-demo-web:latest"
 }
 
 # -----------------------------------------------------------------------------
@@ -137,13 +137,13 @@ variable "jwt_secret" {
 variable "jwt_issuer" {
   description = "JWT issuer claim"
   type        = string
-  default     = "fullstack-template"
+  default     = "x-to-demo"
 }
 
 variable "jwt_audience" {
   description = "JWT audience claim"
   type        = string
-  default     = "fullstack-template"
+  default     = "x-to-demo"
 }
 
 # -----------------------------------------------------------------------------
@@ -181,7 +181,7 @@ variable "email_from_address" {
 variable "email_from_name" {
   description = "Default from name for emails"
   type        = string
-  default     = "Fullstack Template"
+  default     = "x-to-demo"
 }
 
 variable "email_web_base_url" {

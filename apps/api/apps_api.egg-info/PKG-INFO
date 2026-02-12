@@ -15,6 +15,8 @@ Requires-Dist: jinja2>=3.1
 Requires-Dist: mjml
 Requires-Dist: pydantic-settings>=2.5
 Requires-Dist: boto3>=1.35
+Requires-Dist: openai>=1.109.0
+Requires-Dist: colorlog>=6.8
 Requires-Dist: pre-commit>=4.5.1
 Requires-Dist: ruff>=0.14.14
 Provides-Extra: dev
