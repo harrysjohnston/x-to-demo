@@ -1,8 +1,3 @@
-Reusable prompt: Feature spec → demo spec
-
-You can paste this directly into an LLM and then append any feature/product specification.
-
-⸻
 
 Prompt
 
@@ -50,19 +45,3 @@ Constraints
 	•	Write in clear, neutral product language suitable for stakeholders.
 
 Now generate the demo specification based on the feature/product specification below.
-
-⸻
-
-Why this works (the principles underneath)
-
-If you want to evolve this later, here’s what the prompt is really doing:
-	1.	Intent extraction, not translation
-It forces the model to identify what the feature is for, not restate how it’s built.
-	2.	Demo ≠ MVP
-The scope framing explicitly prevents overbuilding and guards against “demo-as-mini-product”.
-	3.	Moment-of-value driven
-The “moment of value” framing ensures the demo peaks at the right place (e.g. first package shown, first insight revealed).
-	4.	Behaviour-first structure
-Core flow + success signals mirrors how demos are actually judged in reviews.
-	5.	Stakeholder-ready output
-The format produces something you can drop into a deck, Notion page, or Figma file with minimal cleanup.

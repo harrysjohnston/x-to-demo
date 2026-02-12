@@ -177,20 +177,9 @@ class Settings(BaseSettings):
         default="artifacts/x-to-demo",
         description="Directory where generated X-to-Demo artifacts are saved",
     )
-    x_to_demo_store_responses: bool = Field(
-        default=False,
-        description="Whether Responses API outputs should be stored by OpenAI",
-    )
     x_to_demo_max_input_chars: int = Field(
         default=60000,
         description="Maximum allowed Input X length in characters",
-    )
-    x_to_demo_response_wait_log_interval_seconds: float = Field(
-        default=15.0,
-        description=(
-            "Seconds between progress logs while awaiting a Responses API call "
-            "during X-to-Demo phases"
-        ),
     )
 
     @property

@@ -77,8 +77,3 @@ I will paste a demo spec. It may include:
 Output format
 
 Return a single, well-structured spec document. Use markdown headings. No code blocks longer than ~30 lines; prefer pseudo-types and concise examples.
-
-Begin
-
-Here is the demo spec to transform:
-<<>>

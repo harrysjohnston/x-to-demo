@@ -8,6 +8,28 @@ vi.mock("@/lib/x-to-demo", async () => {
   return {
     ...actual,
     runXToDemoPipeline: vi.fn(),
+    getXToDemoRun: vi.fn(async () => ({
+      run_id: "run-test-1",
+      created_at: "2026-02-12T12:00:00Z",
+      updated_at: "2026-02-12T12:01:00Z",
+      model: "gpt-5.2",
+      reasoning_effort: "xhigh",
+      stop_after_phase: "code_spec",
+      next_phase_key: null,
+      phases: [
+        { phase_key: "feature_spec", title: "Phase 1", status: "completed" },
+        { phase_key: "demo_spec", title: "Phase 2", status: "completed" },
+        { phase_key: "code_spec", title: "Phase 3", status: "completed" },
+      ],
+      artifacts: [],
+      usage_totals: {},
+      cost_totals: null,
+    })),
+    resumeXToDemoRun: vi.fn(),
+    updateXToDemoArtifact: vi.fn(),
+    downloadXToDemoArtifact: vi.fn(),
+    downloadXToDemoRun: vi.fn(),
+    downloadBlob: vi.fn(),
   };
 });
 
@@ -31,7 +53,11 @@ const fakeResponse = {
   reasoning_effort: "xhigh" as const,
   artifacts: [],
   final_code_spec: "# Code Spec",
-  final_code_spec_path: "artifacts/x-to-demo/run-test-1/04-phase-4.md",
+  final_code_spec_path: "artifacts/x-to-demo/run-test-1/code_spec.md",
+  stop_after_phase: "code_spec" as const,
+  next_phase_key: null,
+  usage_totals: {},
+  cost_totals: null,
 };
 
 describe("XToDemoStudio", () => {
@@ -62,6 +88,7 @@ describe("XToDemoStudio", () => {
         feature_name_hint: undefined,
         model: "gpt-5.2",
         reasoning_effort: "xhigh",
+        stop_after_phase: "code_spec",
       });
     });
   });
