@@ -139,7 +139,7 @@ class XToDemoPhaseStatus(BaseModel):
         description="Stable phase identifier"
     )
     title: str = Field(description="Human-readable phase title")
-    status: Literal["pending", "completed", "failed", "stale"] = Field(
+    status: Literal["pending", "running", "completed", "failed", "stale"] = Field(
         description="Current phase execution status"
     )
     input_artifact_ref: str | None = Field(

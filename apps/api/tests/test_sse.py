@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import pytest
@@ -177,6 +178,29 @@ class TestPubSubManager:
         finally:
             pubsub.unsubscribe(client_id1)
             pubsub.unsubscribe(client_id2)
+
+    @pytest.mark.asyncio
+    async def test_publish_from_worker_thread_wakes_waiting_subscriber(self):
+        """Test that cross-thread publish wakes an active subscriber promptly."""
+        client_id, queue = pubsub.subscribe(user_id=7)
+        wait_task: asyncio.Task[SSEEvent] | None = None
+
+        try:
+            wait_task = asyncio.create_task(queue.get())
+            await asyncio.sleep(0)
+
+            event = SSEEvent(event="threaded", data={"ok": True})
+            delivered = await asyncio.to_thread(
+                lambda: asyncio.run(pubsub.publish(event, user_id=7))
+            )
+
+            assert delivered == 1
+            received = await asyncio.wait_for(wait_task, timeout=0.5)
+            assert received.event == "threaded"
+        finally:
+            if wait_task is not None and not wait_task.done():
+                wait_task.cancel()
+            pubsub.unsubscribe(client_id)
 
 
 class TestLoginSetsCookie:

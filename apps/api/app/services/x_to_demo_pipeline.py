@@ -137,6 +137,7 @@ class XToDemoPipelineService:
             conversation_id=conversation_id,
             run_input=run_input,
         )
+        self._persist_manifest(run_dir=run_dir, manifest=manifest)
 
         self._publish_progress_event(
             user_id=user_id,
@@ -515,6 +516,9 @@ class XToDemoPipelineService:
             is_resume=is_resume,
         )
 
+    def _mark_phase_running(self, *, manifest: dict[str, Any], phase_key: PhaseKey) -> None:
+        self._manifest_manager.mark_phase_running(manifest=manifest, phase_key=phase_key)
+
     def _mark_phase_failed(
         self, *, manifest: dict[str, Any], phase_key: PhaseKey, error: str
     ) -> None:
@@ -573,6 +577,10 @@ class XToDemoPipelineService:
                     f"received {type(current_input).__name__}"
                 )
 
+            self._mark_phase_running(manifest=manifest, phase_key=phase.key)
+            manifest["updated_at"] = datetime.now(UTC).isoformat()
+            self._persist_manifest(run_dir=run_dir, manifest=manifest)
+
             self._publish_progress_event(
                 user_id=user_id,
                 payload={
@@ -609,6 +617,7 @@ class XToDemoPipelineService:
                     is_resume=is_resume,
                 )
                 manifest["updated_at"] = datetime.now(UTC).isoformat()
+                self._persist_manifest(run_dir=run_dir, manifest=manifest)
 
                 self._publish_progress_event(
                     user_id=user_id,
@@ -634,6 +643,7 @@ class XToDemoPipelineService:
             except Exception as exc:
                 self._mark_phase_failed(manifest=manifest, phase_key=phase.key, error=str(exc))
                 manifest["updated_at"] = datetime.now(UTC).isoformat()
+                self._persist_manifest(run_dir=run_dir, manifest=manifest)
                 self._publish_progress_event(
                     user_id=user_id,
                     payload={

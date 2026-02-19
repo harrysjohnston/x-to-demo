@@ -62,7 +62,7 @@ export interface XToDemoRunResponse {
 export interface XToDemoPhaseStatus {
   phase_key: XToDemoPhaseKey;
   title: string;
-  status: "pending" | "completed" | "failed" | "stale";
+  status: "pending" | "running" | "completed" | "failed" | "stale";
   input_artifact_ref?: XToDemoPhaseKey | null;
   output_json_path?: string | null;
   output_md_path?: string | null;

@@ -139,6 +139,12 @@ class PipelineManifestManager:
         record["completed_at"] = datetime.now(UTC).isoformat()
         record["is_resume"] = is_resume
 
+    def mark_phase_running(self, *, manifest: dict[str, Any], phase_key: PhaseKey) -> None:
+        record = self.phase_record(manifest, phase_key)
+        record["status"] = "running"
+        record["error"] = None
+        record["completed_at"] = None
+
     def mark_phase_failed(
         self, *, manifest: dict[str, Any], phase_key: PhaseKey, error: str
     ) -> None:

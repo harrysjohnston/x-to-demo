@@ -221,6 +221,36 @@ def test_openai_compatible_schema_sets_additional_properties_false_recursively()
     assert normalized["properties"]["choices"]["items"]["additionalProperties"] is False
     assert normalized["$defs"]["meta"]["additionalProperties"] is False
 
+    # OpenAI Responses API requires: required must include every key in properties
+    assert set(normalized["required"]) == {"name", "nested", "choices"}
+    assert set(normalized["properties"]["nested"]["required"]) == {"count"}
+    assert set(normalized["properties"]["choices"]["items"]["required"]) == {"label"}
+    assert set(normalized["$defs"]["meta"]["required"]) == {"ok"}
+
+
+def test_openai_compatible_schema_strips_keywords_from_refs() -> None:
+    """$ref cannot have sibling keywords like description."""
+    raw_schema = {
+        "type": "object",
+        "properties": {
+            "source": {
+                "$ref": "#/$defs/SourceInfo",
+                "description": "Source and provenance metadata.",
+            },
+        },
+        "required": ["source"],
+        "$defs": {
+            "SourceInfo": {
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            }
+        },
+    }
+    normalized = XToDemoPipelineService._openai_compatible_schema(raw_schema)
+    assert normalized["properties"]["source"] == {"$ref": "#/$defs/SourceInfo"}
+    assert "description" not in normalized["properties"]["source"]
+
 
 def test_wait_logging_reports_progress_at_intervals(monkeypatch, caplog, tmp_path) -> None:
     class _FakeFuture:

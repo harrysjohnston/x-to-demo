@@ -56,10 +56,81 @@ def schema_excerpt_json(schema_json: dict[str, Any]) -> str:
 
 
 def openai_compatible_schema(schema_json: dict[str, Any]) -> dict[str, Any]:
-    """Ensure generated JSON Schema satisfies strict response_format constraints."""
+    """Ensure generated JSON Schema satisfies strict response_format constraints.
+
+    OpenAI Responses API requires:
+    - additionalProperties: false on objects
+    - every object schema to have 'required' including every key in 'properties'
+    - $ref must be the sole keyword (no description, title, etc. alongside $ref)
+    """
     normalized = copy.deepcopy(schema_json)
     enforce_no_additional_properties(normalized)
+    enforce_required_includes_all_properties(normalized)
+    strip_keywords_from_refs(normalized)
     return normalized
+
+
+def strip_keywords_from_refs(node: object) -> None:
+    """Remove keywords like description from schema objects that contain $ref."""
+    if isinstance(node, dict):
+        if "$ref" in node and len(node) > 1:
+            # $ref cannot have sibling keywords; keep only $ref
+            ref = node["$ref"]
+            node.clear()
+            node["$ref"] = ref
+
+        for key in ("properties", "$defs", "definitions", "patternProperties"):
+            value = node.get(key)
+            if isinstance(value, dict):
+                for child in value.values():
+                    strip_keywords_from_refs(child)
+
+        for key in ("items", "additionalItems", "contains", "if", "then", "else", "not"):
+            if key in node:
+                strip_keywords_from_refs(node[key])
+
+        for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
+            value = node.get(key)
+            if isinstance(value, list):
+                for child in value:
+                    strip_keywords_from_refs(child)
+
+    elif isinstance(node, list):
+        for child in node:
+            strip_keywords_from_refs(child)
+
+
+def enforce_required_includes_all_properties(node: object) -> None:
+    """Ensure every object schema has required=[...all property keys...]."""
+    if isinstance(node, dict):
+        node_type = node.get("type")
+        if node_type == "object":
+            props = node.get("properties")
+            if isinstance(props, dict) and props:
+                # OpenAI requires: required must include every key in properties
+                required = set(node.get("required") or [])
+                required.update(props.keys())
+                node["required"] = sorted(required)
+
+        for key in ("properties", "$defs", "definitions", "patternProperties"):
+            value = node.get(key)
+            if isinstance(value, dict):
+                for child in value.values():
+                    enforce_required_includes_all_properties(child)
+
+        for key in ("items", "additionalItems", "contains", "if", "then", "else", "not"):
+            if key in node:
+                enforce_required_includes_all_properties(node[key])
+
+        for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
+            value = node.get(key)
+            if isinstance(value, list):
+                for child in value:
+                    enforce_required_includes_all_properties(child)
+
+    elif isinstance(node, list):
+        for child in node:
+            enforce_required_includes_all_properties(child)
 
 
 def enforce_no_additional_properties(node: object) -> None:

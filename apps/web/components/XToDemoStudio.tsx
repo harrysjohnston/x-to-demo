@@ -267,15 +267,60 @@ export function XToDemoStudio() {
     const nextRun = toRunResponse(detail);
     hydrateFromRunResult(nextRun);
 
+    const running = detail.phases.find((phase) => phase.status === "running")?.phase_key ?? null;
     const stale = detail.phases
       .filter((phase) => phase.status === "stale")
       .map((phase) => phase.phase_key);
     const failed = detail.phases
       .filter((phase) => phase.status === "failed")
       .map((phase) => phase.phase_key);
+    setActivePhaseKey(running);
     setStalePhaseKeys(stale);
     setFailedPhaseKeys(failed);
   };
+
+  useEffect(() => {
+    if (!trackedRunId) return;
+    if (!isRunning && !isResuming) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const detail = await getXToDemoRun(trackedRunId);
+        if (cancelled) return;
+        setRunResult(toRunResponse(detail));
+
+        const completed = detail.phases
+          .filter((phase) => phase.status === "completed")
+          .map((phase) => phase.phase_key);
+        const stale = detail.phases
+          .filter((phase) => phase.status === "stale")
+          .map((phase) => phase.phase_key);
+        const failed = detail.phases
+          .filter((phase) => phase.status === "failed")
+          .map((phase) => phase.phase_key);
+        const running =
+          detail.phases.find((phase) => phase.status === "running")?.phase_key ?? null;
+
+        setCompletedPhaseKeys(completed);
+        setStalePhaseKeys(stale);
+        setFailedPhaseKeys(failed);
+        setActivePhaseKey(running);
+      } catch {
+        // Best-effort polling while run is in progress.
+      }
+    };
+
+    void poll();
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isResuming, isRunning, trackedRunId]);
 
   const handleRunPipeline = async () => {
     if (!canRun) return;
@@ -419,8 +464,8 @@ export function XToDemoStudio() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-card/40 p-6 backdrop-blur-sm">
+    <div className="grid items-start gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/40 p-6 backdrop-blur-sm">
         <div className="absolute right-0 top-0 h-20 w-20 bg-gradient-to-bl from-primary/20 to-transparent" />
         <header className="mb-6">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -618,7 +663,7 @@ export function XToDemoStudio() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border/70 bg-card/40 p-6 backdrop-blur-sm">
+      <section className="min-w-0 rounded-2xl border border-border/70 bg-card/40 p-6 backdrop-blur-sm">
         <header className="mb-6">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Pipeline output
@@ -663,7 +708,7 @@ export function XToDemoStudio() {
           <div className="mt-6 space-y-4 animate-fade-up">
             <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-primary">Run state</p>
-              <p className="mt-1 text-sm text-foreground">
+              <p className="mt-1 break-all text-sm text-foreground">
                 {runResult.run_id} • {formatTimestamp(runResult.created_at)} • {runResult.model} •{" "}
                 {runResult.reasoning_effort}
               </p>
@@ -756,7 +801,7 @@ export function XToDemoStudio() {
 
               {activeArtifact ? (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="break-all rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
                     Markdown path: <code>{activeArtifact.saved_path}</code>
                     <br />
                     JSON path: <code>{activeArtifact.json_path}</code>

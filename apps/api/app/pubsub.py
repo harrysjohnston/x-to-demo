@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -21,6 +22,7 @@ class Subscriber:
     client_id: str
     user_id: int | None
     queue: asyncio.Queue[SSEEvent]
+    loop: asyncio.AbstractEventLoop | None
 
 
 @dataclass
@@ -36,7 +38,7 @@ class PubSubManager:
 
     max_queue_size: int = 100
     _subscribers: dict[str, Subscriber] = field(default_factory=dict)
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def subscribe(self, user_id: int | None = None) -> tuple[str, asyncio.Queue[SSEEvent]]:
         """Subscribe a new client and return (client_id, queue).
@@ -47,10 +49,16 @@ class PubSubManager:
         Returns:
             Tuple of (client_id, queue) for receiving events.
         """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
         client_id = uuid4().hex
         queue: asyncio.Queue[SSEEvent] = asyncio.Queue(maxsize=self.max_queue_size)
-        subscriber = Subscriber(client_id=client_id, user_id=user_id, queue=queue)
-        self._subscribers[client_id] = subscriber
+        subscriber = Subscriber(client_id=client_id, user_id=user_id, queue=queue, loop=loop)
+        with self._lock:
+            self._subscribers[client_id] = subscriber
         logger.debug("Client %s subscribed (user_id=%s)", client_id, user_id)
         return client_id, queue
 
@@ -60,8 +68,12 @@ class PubSubManager:
         Args:
             client_id: The client ID to unsubscribe.
         """
-        if client_id in self._subscribers:
-            del self._subscribers[client_id]
+        removed = False
+        with self._lock:
+            if client_id in self._subscribers:
+                del self._subscribers[client_id]
+                removed = True
+        if removed:
             logger.debug("Client %s unsubscribed", client_id)
 
     async def publish(self, event: SSEEvent, user_id: int | None = None) -> int:
@@ -75,27 +87,56 @@ class PubSubManager:
         Returns:
             Number of subscribers that received the event.
         """
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        with self._lock:
+            subscribers = list(self._subscribers.values())
+
         delivered = 0
-        for subscriber in list(self._subscribers.values()):
+        for subscriber in subscribers:
             # Filter by user_id if specified
             if user_id is not None and subscriber.user_id != user_id:
                 continue
 
-            try:
-                # Non-blocking put - drop if queue is full (backpressure)
-                subscriber.queue.put_nowait(event)
+            if subscriber.loop and subscriber.loop is not current_loop:
+                if subscriber.loop.is_closed():
+                    logger.debug("Skipping publish for closed loop client %s", subscriber.client_id)
+                    continue
+                if subscriber.queue.full():
+                    logger.warning("Queue full for client %s, dropping event", subscriber.client_id)
+                    continue
+                subscriber.loop.call_soon_threadsafe(
+                    self._put_event_nowait,
+                    subscriber,
+                    event,
+                )
                 delivered += 1
-            except asyncio.QueueFull:
-                # Drop oldest and add new (or just skip - we choose to skip)
-                logger.warning("Queue full for client %s, dropping event", subscriber.client_id)
+                continue
+
+            if self._put_event_nowait(subscriber, event):
+                delivered += 1
 
         logger.debug("Published event to %d subscribers", delivered)
         return delivered
 
+    @staticmethod
+    def _put_event_nowait(subscriber: Subscriber, event: SSEEvent) -> bool:
+        try:
+            # Non-blocking put - drop if queue is full (backpressure)
+            subscriber.queue.put_nowait(event)
+            return True
+        except asyncio.QueueFull:
+            logger.warning("Queue full for client %s, dropping event", subscriber.client_id)
+            return False
+
     @property
     def subscriber_count(self) -> int:
         """Return the current number of subscribers."""
-        return len(self._subscribers)
+        with self._lock:
+            return len(self._subscribers)
 
 
 # Global singleton instance
