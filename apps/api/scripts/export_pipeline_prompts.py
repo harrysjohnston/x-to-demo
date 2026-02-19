@@ -27,7 +27,46 @@ def minimal_phase_inputs() -> tuple[PipelineRunInput, FeatureSpecArtifact, DemoS
             "feature_name": "",
             "intent": {"problem": "", "objective": "", "desired_outcome": "", "target_persona": ""},
             "external_behavior": {"inputs": [], "outputs": [], "states": [], "errors": []},
-            "acceptance_criteria": [],
+            "innovation_focus": {
+                "ai_headline_capabilities": [
+                    {
+                        "name": "capability_1",
+                        "input_modalities": ["text"],
+                        "user_value": "",
+                        "what_is_generated_or_optimized": "",
+                        "why_ai_or_innovation_is_required": "",
+                        "inputs": {"modality": "text", "description": ""},
+                        "outputs": {"modality": "text", "description": ""},
+                        "demo_proof": "",
+                    }
+                ],
+                "assumptions_and_constraints": {
+                    "text_output_by_default": True,
+                    "no_external_tools_unless_necessary": True,
+                    "minimalist_ui": True,
+                    "system_theme_support": True,
+                    "notes": "",
+                },
+                "guardrails_summary": {
+                    "off_topic_short_circuit": "",
+                    "unsafe_or_disallowed_short_circuit": "",
+                    "allowed_summary": "",
+                    "refused_summary": "",
+                },
+                "tooling_need_assessment": {
+                    "needs_tools": False,
+                    "why_tools_needed": "not needed",
+                },
+            },
+            "acceptance_criteria": [
+                {
+                    "capability_ref": "capability_1",
+                    "given": "",
+                    "when": "",
+                    "then": [""],
+                }
+            ],
+            "excluded_plumbing": ["auth"],
             "invariants": [],
             "success_metrics": [],
             "versioning": {"version": "", "changelog": [], "updated_at_utc": ""},
@@ -40,6 +79,88 @@ def minimal_phase_inputs() -> tuple[PipelineRunInput, FeatureSpecArtifact, DemoS
             "demo_overview": "",
             "demo_scope": {"in_scope": [], "out_of_scope": []},
             "demo_format": "",
+            "headline_demo_items": [
+                {
+                    "capability_ref": "capability_1",
+                    "interaction_mode": "text_chat",
+                    "user_story_in_demo": "",
+                    "ai_moment": "",
+                    "success_looks_like": "",
+                }
+            ],
+            "interaction_requirements": {
+                "requires_voice": False,
+                "requires_tool_loop": False,
+            },
+            "ai_pipeline_delineation": {
+                "ai_components": [""],
+                "non_ai_components": [""],
+                "where_innovation_lives": "",
+            },
+            "demo_experience": {
+                "minimalist_views": [
+                    {
+                        "name": "",
+                        "purpose": "",
+                        "primary_component": "",
+                        "visible_elements": [""],
+                        "hidden_or_omitted_elements": [],
+                    }
+                ],
+                "theme_support": {"system_dark_light": True},
+                "device_target": {
+                    "is_mobile_like": False,
+                    "smartphone_frame": {
+                        "enabled": False,
+                        "width": None,
+                        "height": None,
+                        "bezel_style": None,
+                    },
+                },
+            },
+            "interactive_walkthrough": {
+                "auto_start_on_launch": True,
+                "retrigger_mechanism": "",
+                "controls": {"next": True, "back": True, "cancel": True},
+                "steps": [
+                    {
+                        "id": "step-1",
+                        "title": "",
+                        "ui_target": "",
+                        "explanation": "",
+                        "what_ai_does_here": "",
+                        "success_criteria": "",
+                    }
+                ],
+            },
+            "synthetic_demo_inputs": {
+                "seed_dataset": {"summary": "", "sample_records": [""]},
+                "default_first_run_inputs": {
+                    "ordered_inputs": [""],
+                    "trigger_action": "",
+                },
+                "why_this_data": "",
+                "safety_and_realism_notes": "",
+                "expected_outputs": {"summary": "", "sample_records": [""]},
+            },
+            "consistency_trace": {
+                "phase1_headline_capability_refs": ["capability_1"],
+                "stable_identifier_rule": "",
+                "walkthrough_alignment_summary": "",
+            },
+            "tooling_decision_trace": {
+                "phase1_needs_tools": False,
+                "phase1_why_tools_needed": "not needed",
+                "must_remain_consistent": True,
+                "consistency_notes": "",
+            },
+            "tooling_plan_if_needed": {
+                "mode": "no_tools",
+                "rationale": "not needed",
+                "tool_definitions": [],
+                "synthetic_data_source": "not used",
+                "ui_visible_tool_call_log": False,
+            },
             "core_flow_steps": [],
             "success_signals": [],
             "example_copy": [],

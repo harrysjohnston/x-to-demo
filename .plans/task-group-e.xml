@@ -1,0 +1,242 @@
+<coding_agent_prompt id="x_to_demo_task_group_e" version="1.0">
+  <meta>
+    <purpose>
+      Implement Task Group E (“Quality gates”) from the X-to-Demo AI-first pipeline task list.
+      These changes MUST NOT add a new pipeline phase (keep Option A: feature_spec → demo_spec → code_spec).
+    </purpose>
+    <inputs>
+      <task_list_markdown_ref>Task Group E — Quality gates (optional, still Option A)</task_list_markdown_ref>
+      <conversation_context_markdown_ref>Compiled project principles + constraints</conversation_context_markdown_ref>
+    </inputs>
+  </meta>
+
+  <global_principles>
+    <ai_first>
+      AI/technical innovation is the first-class citizen. Demo scope is limited to 1–3 headline items.
+    </ai_first>
+    <minimalism>
+      Minimalist UI; avoid “plumbing” unless explicitly required. Browser-compatible always; smartphone-framed view only if the proposal indicates a mobile app.
+    </minimalism>
+    <openai_integration>
+      CodeSpec MUST select at least one of: Responses API, Realtime API, Agents SDK. Tools only if absolutely necessary; if used, must use synthetic data and display tool calls/results in UI.
+    </openai_integration>
+    <walkthrough>
+      Interactive in-app walkthrough (auto-start, retriggerable, cancellable). Not a presenter script.
+    </walkthrough>
+    <testing>
+      CodeSpec must mandate comprehensive unit tests and running them continuously during build.
+    </testing>
+  </global_principles>
+
+  <scope>
+    <in_scope>
+      <item>Add schema fields and prompt instructions to enforce Task Group E quality gates.</item>
+      <item>Keep pipeline phases unchanged; only adjust schema models and prompt templates as needed.</item>
+      <item>Ensure strict structured-output JSON Schema compatibility (additionalProperties false, required fields, etc.).</item>
+    </in_scope>
+    <out_of_scope>
+      <item>Adding new pipeline phases or complex orchestration changes.</item>
+      <item>XToDemoStudio UI/auth or any app/web UI not directly part of spec generation.</item>
+      <item>Non-essential infrastructure (auth, billing, observability, CI/CD, etc.) unless explicitly demanded by proposal.</item>
+    </out_of_scope>
+  </scope>
+
+  <target_files>
+    <file>apps/api/app/x_to_demo/schemas/demo_spec.py</file>
+    <file>apps/api/app/x_to_demo/schemas/code_spec.py</file>
+    <file>apps/api/app/x_to_demo/pipeline/prompts.py</file>
+    <file optional="true">apps/api/app/x_to_demo/schemas/__init__.py</file>
+  </target_files>
+
+  <task_group_e>
+    <task id="E0" name="Synthetic-first demo input data" required="true">
+      <goal>
+        Every generated DemoSpec must include synthetic input data so the downstream demo can run deterministically on first launch,
+        enabling immediate testing/validation without ad-hoc human input.
+      </goal>
+
+      <phase2_demo_spec_changes>
+        <add_required_field name="synthetic_demo_inputs">
+          <structure>
+            <field name="seed_dataset" type="object_or_string">
+              Small, human-readable dataset embedded as JSON/text. Must be safe and non-PII.
+            </field>
+            <field name="default_first_run_inputs" type="object">
+              Exact inputs the demo app should use on first launch to exercise the headline capabilities.
+            </field>
+            <field name="why_this_data" type="string">
+              Explain how the synthetic data covers the 1–3 headline capabilities.
+            </field>
+            <field name="safety_and_realism_notes" type="string">
+              Confirm no unsafe content/PII; realistic but bounded.
+            </field>
+            <field name="expected_outputs" type="object_or_string">
+              What the demo should display for the first run (can be structured expectations or concise textual expectations).
+            </field>
+          </structure>
+          <schema_rules>
+            <rule>Field MUST be required in DemoSpec schema.</rule>
+            <rule>Keep payload small; embed minimal datasets only.</rule>
+            <rule>Must align to headline demo items (1–3).</rule>
+          </schema_rules>
+        </add_required_field>
+      </phase2_demo_spec_changes>
+
+      <phase3_code_spec_changes>
+        <add_required_field name="synthetic_data_implementation">
+          <structure>
+            <field name="data_location" type="string">
+              Where synthetic data lives in repo (e.g., local JSON file path or module constant).
+            </field>
+            <field name="load_on_startup" type="string">
+              How app loads synthetic data deterministically on startup.
+            </field>
+            <field name="auto_populate_first_run" type="string">
+              How the first-run flow auto-populates inputs and triggers the initial run.
+            </field>
+            <field name="reset_and_rerun_control" type="string">
+              How user can reset to the seed and re-run identical demo.
+            </field>
+            <field name="determinism_guidance" type="string">
+              Use deterministic parameters where possible; otherwise define expected structure/snapshots.
+            </field>
+          </structure>
+          <schema_rules>
+            <rule>Field MUST be required in CodeSpec schema.</rule>
+            <rule>Must be implementation-ready but stack-flexible (describe behavior, not frameworks).</rule>
+          </schema_rules>
+        </add_required_field>
+      </phase3_code_spec_changes>
+
+      <prompt_updates>
+        <file>apps/api/app/x_to_demo/pipeline/prompts.py</file>
+        <instructions>
+          <instruction>
+            Demo must succeed on FIRST LAUNCH using synthetic inputs; include seed dataset, first-run inputs, and expected outputs.
+          </instruction>
+          <instruction>
+            Synthetic data must be explicitly designed to exercise the 1–3 headline capabilities and avoid undefined behavior.
+          </instruction>
+        </instructions>
+      </prompt_updates>
+
+      <acceptance_criteria>
+        <criterion>
+          DemoSpec output always contains complete synthetic_demo_inputs (seed, default inputs, expected outputs).
+        </criterion>
+        <criterion>
+          CodeSpec output always contains a clear plan to store/load/apply synthetic data on first run and allow deterministic reruns.
+        </criterion>
+      </acceptance_criteria>
+    </task>
+
+    <task id="E1" name="Internal consistency requirements" required="true">
+      <goal>
+        Enforce cross-phase consistency: Phase 2 demo items must reference Phase 1 headline capabilities;
+        Phase 3 must reflect the same headline items and walkthrough requirements.
+      </goal>
+
+      <implementation>
+        <schema_level_where_possible>
+          <item>
+            In DemoSpec: ensure each headline_demo_item references a capability_ref that matches Phase 1 naming/IDs.
+            (Schema can enforce “presence and shape”; prompts enforce correct referencing.)
+          </item>
+          <item>
+            In CodeSpec: ensure structures (prompt_pack, walkthrough_implementation, tests) are explicitly enumerated per headline item.
+          </item>
+        </schema_level_where_possible>
+
+        <prompt_level_validation_expectations>
+          <item>
+            Add explicit “consistency checklist” reminders in each phase prompt:
+            Phase 2 must map from Phase 1 headlines; Phase 3 must map from Phase 2 headlines and walkthrough steps.
+          </item>
+          <item>
+            Require the model to reuse stable identifiers/strings for headline items across phases.
+          </item>
+        </prompt_level_validation_expectations>
+      </implementation>
+
+      <acceptance_criteria>
+        <criterion>
+          DemoSpec headline_demo_items clearly map to the Phase 1 ai_headline_capabilities via capability_ref.
+        </criterion>
+        <criterion>
+          CodeSpec explicitly implements and tests each headline capability and matches the walkthrough spec from DemoSpec.
+        </criterion>
+      </acceptance_criteria>
+    </task>
+
+    <task id="E2" name="Tooling-only-if-needed decision trace" required="true">
+      <goal>
+        Force a justification trail for tool usage across phases: Phase 1 decides and explains;
+        Phase 2/3 carry that forward consistently.
+      </goal>
+
+      <implementation>
+        <phase1_dependency_note>
+          Phase 1 already has (or will have) tooling_need_assessment. Task E2 ensures the trace is preserved through Phase 2/3.
+        </phase1_dependency_note>
+
+        <phase2_demo_spec_changes>
+          <item>
+            Add/require a section that explicitly states whether tools are used, and if used:
+            synthetic data + UI-visible tool call log requirement remains consistent with earlier rules.
+          </item>
+        </phase2_demo_spec_changes>
+
+        <phase3_code_spec_changes>
+          <item>
+            Require a “tooling plan” section that either:
+            (a) defines tool interfaces + synthetic data + UI visibility + mocks, OR
+            (b) explicitly states “no tools used” and ensures mocks cover OpenAI calls only.
+          </item>
+        </phase3_code_spec_changes>
+
+        <prompt_updates>
+          <item>
+            Add an instruction: “You must keep tooling decision consistent across phases; if Phase 1 says no tools, do not introduce tools later.”
+          </item>
+          <item>
+            If tools are used, require a short justification and show how tool results are displayed in the demo UI.
+          </item>
+        </prompt_updates>
+      </implementation>
+
+      <acceptance_criteria>
+        <criterion>Tooling decision is explicit in Phase 1 and carried forward without contradiction in Phase 2/3.</criterion>
+        <criterion>If tools are used, synthetic data + UI tool-call visibility + test mocks are specified.</criterion>
+      </acceptance_criteria>
+    </task>
+  </task_group_e>
+
+  <engineering_constraints>
+    <structured_outputs>
+      <rule>All outputs must match schema exactly; no extra fields; additionalProperties:false throughout.</rule>
+      <rule>Prefer small, explicit objects over freeform prose where downstream agents need determinism.</rule>
+    </structured_outputs>
+    <stack_flexibility>
+      <rule>Describe behaviors/requirements, not specific frameworks, unless unavoidable.</rule>
+    </stack_flexibility>
+  </engineering_constraints>
+
+  <deliverables>
+    <deliverable>
+      Updated DemoSpec schema includes required synthetic_demo_inputs and consistency/tooling trace fields.
+    </deliverable>
+    <deliverable>
+      Updated CodeSpec schema includes required synthetic_data_implementation and consistent tooling plan representation.
+    </deliverable>
+    <deliverable>
+      Updated prompts enforce synthetic-first first launch, cross-phase consistency, and tooling decision trace.
+    </deliverable>
+  </deliverables>
+
+  <done_definition>
+    <item>E0: Demo is runnable deterministically on first launch using included synthetic inputs and expected outputs.</item>
+    <item>E1: Headline items remain consistent and traceable across all 3 phases.</item>
+    <item>E2: Tooling usage is consistently justified and propagated across phases; no surprise tools later.</item>
+    <item>No new pipeline phases added; schemas remain strict and OpenAI structured-output compatible.</item>
+  </done_definition>
+</coding_agent_prompt>

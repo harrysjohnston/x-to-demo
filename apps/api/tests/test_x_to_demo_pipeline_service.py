@@ -55,7 +55,7 @@ def _build_service(*, output_dir, responses: list[_FakeResponse]) -> XToDemoPipe
 
 def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "feature_name": feature_name,
         "status": "draft",
         "source": {
@@ -75,8 +75,46 @@ def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, objec
             "states": ["draft", "review", "ready"],
             "errors": ["input_too_vague", "conflicting_constraints"],
         },
+        "innovation_focus": {
+            "ai_headline_capabilities": [
+                {
+                    "name": "intent_summarization",
+                    "input_modalities": ["text"],
+                    "user_value": "Fast conversion of noisy input into a clear product intent.",
+                    "what_is_generated_or_optimized": "A concise intent summary with structured focus.",
+                    "why_ai_or_innovation_is_required": "Semantic consolidation is not deterministic enough for fixed rules.",
+                    "inputs": {
+                        "modality": "text",
+                        "description": "Raw notes and context supplied by the user.",
+                    },
+                    "outputs": {
+                        "modality": "text",
+                        "description": "Structured intent-focused summary for downstream phases.",
+                    },
+                    "demo_proof": "Demo shows coherent intent extraction from ambiguous notes.",
+                }
+            ],
+            "assumptions_and_constraints": {
+                "text_output_by_default": True,
+                "no_external_tools_unless_necessary": True,
+                "minimalist_ui": True,
+                "system_theme_support": True,
+                "notes": "Focus on one headline AI behavior.",
+            },
+            "guardrails_summary": {
+                "off_topic_short_circuit": "Reject unrelated requests and restate scope.",
+                "unsafe_or_disallowed_short_circuit": "Refuse disallowed content and return safe fallback.",
+                "allowed_summary": "Feature-planning and demo-spec generation requests are allowed.",
+                "refused_summary": "Unsafe/off-topic requests are refused with short explanation.",
+            },
+            "tooling_need_assessment": {
+                "needs_tools": False,
+                "why_tools_needed": "not needed",
+            },
+        },
         "acceptance_criteria": [
             {
+                "capability_ref": "intent_summarization",
                 "given": "Input X includes conflicting notes.",
                 "when": "Phase 1 runs.",
                 "then": [
@@ -85,6 +123,7 @@ def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, objec
                 ],
             }
         ],
+        "excluded_plumbing": ["auth", "billing", "observability"],
         "invariants": ["Spec-first behaviour over implementation details."],
         "success_metrics": ["Required keys present in output JSON."],
         "versioning": {
@@ -97,7 +136,7 @@ def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, objec
 
 def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "feature_name": feature_name,
         "status": "draft",
         "source": {
@@ -111,6 +150,118 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "out_of_scope": ["Production data integrations"],
         },
         "demo_format": "Scripted prototype walkthrough",
+        "headline_demo_items": [
+            {
+                "capability_ref": "intent_summarization",
+                "interaction_mode": "text_chat",
+                "user_story_in_demo": "User pastes messy notes and receives a coherent intent summary.",
+                "ai_moment": "Model call parses and restructures ambiguous notes into a focused plan.",
+                "success_looks_like": "Clear structured output appears in one action.",
+            }
+        ],
+        "interaction_requirements": {
+            "requires_voice": False,
+            "requires_tool_loop": False,
+        },
+        "ai_pipeline_delineation": {
+            "ai_components": ["Intent summarization call"],
+            "non_ai_components": ["Input editor", "Results panel", "Walkthrough UI"],
+            "where_innovation_lives": "Semantic synthesis and structured intent extraction.",
+        },
+        "demo_experience": {
+            "minimalist_views": [
+                {
+                    "name": "Input",
+                    "purpose": "Capture the raw notes.",
+                    "primary_component": "InputXEditor",
+                    "visible_elements": ["textarea", "run button"],
+                    "hidden_or_omitted_elements": ["auth panel", "admin controls"],
+                },
+                {
+                    "name": "Output",
+                    "purpose": "Show AI-generated structured summary.",
+                    "primary_component": "SummaryPanel",
+                    "visible_elements": ["summary card", "evidence list"],
+                    "hidden_or_omitted_elements": ["analytics widgets"],
+                },
+            ],
+            "theme_support": {"system_dark_light": True},
+            "device_target": {
+                "is_mobile_like": False,
+                "smartphone_frame": {
+                    "enabled": False,
+                    "width": None,
+                    "height": None,
+                    "bezel_style": None,
+                },
+            },
+        },
+        "interactive_walkthrough": {
+            "auto_start_on_launch": True,
+            "retrigger_mechanism": "Help button in the header.",
+            "controls": {"next": True, "back": True, "cancel": True},
+            "steps": [
+                {
+                    "id": "step-input",
+                    "title": "Provide Input X",
+                    "ui_target": "input-editor",
+                    "explanation": "Paste raw notes into the input editor.",
+                    "what_ai_does_here": "No model call yet; this prepares model-ready context.",
+                    "success_criteria": "Input field contains sample synthetic content.",
+                },
+                {
+                    "id": "step-generate",
+                    "title": "Generate summary",
+                    "ui_target": "run-button",
+                    "explanation": "Trigger the AI summary generation flow.",
+                    "what_ai_does_here": "Model generates structured intent summary.",
+                    "success_criteria": "Summary panel renders structured output sections.",
+                },
+            ],
+        },
+        "synthetic_demo_inputs": {
+            "seed_dataset": {
+                "summary": "Seed note examples for deterministic first run.",
+                "sample_records": [
+                    "Need an app demo from this noisy stakeholder thread.",
+                    "Keep scope tight and highlight AI value.",
+                ],
+            },
+            "default_first_run_inputs": {
+                "ordered_inputs": [
+                    "Need a concise feature intent from mixed notes.",
+                    "Show only one headline capability.",
+                ],
+                "trigger_action": "Auto-populate editor and invoke run on first launch.",
+            },
+            "why_this_data": "Covers the single headline summarization capability deterministically.",
+            "safety_and_realism_notes": "Synthetic and non-PII, but representative of real planning notes.",
+            "expected_outputs": {
+                "summary": "Expected sections rendered by first-run output.",
+                "sample_records": [
+                    "Problem: ambiguous planning notes",
+                    "Objective: produce a concise structured intent",
+                ],
+            },
+        },
+        "consistency_trace": {
+            "phase1_headline_capability_refs": ["intent_summarization"],
+            "stable_identifier_rule": "Reuse exact capability_ref strings from phase 1.",
+            "walkthrough_alignment_summary": "Walkthrough steps map directly to the same capability.",
+        },
+        "tooling_decision_trace": {
+            "phase1_needs_tools": False,
+            "phase1_why_tools_needed": "not needed",
+            "must_remain_consistent": True,
+            "consistency_notes": "No tools are introduced in phase 2.",
+        },
+        "tooling_plan_if_needed": {
+            "mode": "no_tools",
+            "rationale": "not needed",
+            "tool_definitions": [],
+            "synthetic_data_source": "not used",
+            "ui_visible_tool_call_log": False,
+        },
         "core_flow_steps": [
             "Paste Input X",
             "Generate digest",
@@ -131,7 +282,7 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
 
 def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "feature_name": feature_name,
         "status": "draft",
         "source": {
@@ -141,17 +292,132 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
         },
         "demo_overview": "Runnable frontend-only demo from the demo spec.",
         "tech_stack": {
-            "frontend": "Next.js",
-            "backend": "FastAPI",
-            "language": "TypeScript",
+            "frontend": "Browser-first web UI compatibility constraints.",
+            "backend": "Optional thin API boundary for model calls.",
+            "language": "TypeScript-compatible frontend implementation constraints.",
+            "frontend_constraints": ["Browser runtime", "Minimal layout", "System theme support"],
+            "backend_constraints": [
+                "Stateless request/response contract",
+                "No production integrations",
+            ],
+            "language_constraints": ["Typed interfaces for structured outputs"],
+        },
+        "openai_integration": {
+            "selected_apis": ["responses"],
+            "why_selected": "Single-turn structured outputs satisfy the focused demo flow.",
+            "decision_rationale": {
+                "primary_interaction_mode": "text",
+                "latency_requirements": "normal",
+                "statefulness": "session-state",
+            },
+            "api_usage_by_headline_item": [
+                {
+                    "headline_item_ref": "intent_summarization",
+                    "selected_api": "responses",
+                    "why_this_api_for_this_item": "Request/response structured output is sufficient for this item.",
+                    "what_would_break_if_swapped": "Replacing with realtime or agents adds unnecessary complexity.",
+                }
+            ],
+            "covers_requires_voice": True,
+            "covers_requires_tool_loop": True,
+            "models": {
+                "primary": "gpt-5.1",
+                "fallbacks": ["gpt-5-mini"],
+            },
+            "response_handling": {
+                "structured_outputs": "Use strict schema-backed JSON output mode.",
+                "parsing_and_validation": "Validate response payloads against phase schemas.",
+                "post_processing": "Normalize field ordering before UI rendering.",
+            },
         },
         "project_changes": ["apps/web/components/XToDemoStudio.tsx"],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
         "state_model": {"fields": ["xInput", "phaseStatus", "artifacts"]},
         "ai_seam": {
+            "prompt_pack": {
+                "system_prompt": "You are a focused planning assistant.",
+                "developer_prompt": "Follow strict schema and constraints.",
+                "user_prompt_template": "Summarize Input X into structured output.",
+                "headline_item_prompts": ["Summarize messy notes into concise intent sections."],
+            },
             "schemas": ["PhaseOutput"],
             "contracts": ["runPhase(input) -> output"],
+            "guardrails": {
+                "input_filters": ["reject_empty_input"],
+                "refusal_policy": "Refuse unsafe or off-topic requests.",
+                "short_circuit_behavior": "Return concise refusal object on disallowed input.",
+            },
             "mock_strategy": "Deterministic fixtures",
+        },
+        "walkthrough_implementation": {
+            "highlight_mechanism": "Step-target CSS highlight overlays tied to stable element ids.",
+            "step_definition_data_model": "Static list of step objects keyed by walkthrough step id.",
+            "auto_start_and_retrigger": "Auto-start on first load and retrigger via help action.",
+        },
+        "synthetic_data_implementation": {
+            "data_location": "Local fixture module under app data folder.",
+            "load_on_startup": "Load seed dataset at app init before first render.",
+            "auto_populate_first_run": "Prefill input and trigger run once on initial launch.",
+            "reset_and_rerun_control": "Reset button restores seed input and reruns flow.",
+            "determinism_guidance": "Use fixed fixtures and deterministic response snapshots.",
+        },
+        "consistency_trace": {
+            "phase2_headline_capability_refs": ["intent_summarization"],
+            "headline_item_implementation": [
+                {
+                    "capability_ref": "intent_summarization",
+                    "prompt_pack_elements": ["headline_item_prompts[0]"],
+                    "walkthrough_step_ids": ["step-input", "step-generate"],
+                    "test_targets": ["summary generation", "walkthrough alignment"],
+                }
+            ],
+            "stable_identifier_rule": "Reuse identical capability_ref values from prior phases.",
+        },
+        "tooling_plan": {
+            "mode": "no_tools",
+            "phase1_needs_tools": False,
+            "consistency_statement": "No tools are introduced after phase 1 no-tools decision.",
+            "tool_interfaces": [],
+            "synthetic_data_source": "not used",
+            "ui_visible_tool_log_behavior": "No tool log rendered when tools are absent.",
+            "mocking_strategy": "Mock OpenAI responses only; no tool mocks required.",
+        },
+        "testing_strategy": {
+            "unit_test_requirements": (
+                "Comprehensive unit tests are mandatory, written alongside implementation, "
+                "run continuously during build, and failures block completion."
+            ),
+            "test_plan_by_module": {
+                "ai_request_response_handling": "Validate structured output parsing and schema enforcement.",
+                "guardrails_short_circuit_behavior": "Verify refusal paths for disallowed input.",
+                "state_transitions_for_core_flows": "Assert state transitions through input->generate->render flow.",
+                "walkthrough_step_mapping_and_highlight_targeting": "Ensure step ids map to expected UI targets.",
+                "tooling_mocks_or_no_tools": "Assert no-tools behavior and OpenAI-only mocking.",
+            },
+            "test_targets": [
+                "AI response parser",
+                "walkthrough controller",
+                "state transition reducer",
+            ],
+            "acceptance_tests_scope_rules": (
+                "Acceptance tests are limited to the one headline capability and exclude plumbing criteria."
+            ),
+            "mocking_instructions": (
+                "Mock OpenAI calls with deterministic fixtures; keep snapshots stable for key rendered sections."
+            ),
+            "verification_steps": [
+                "Run unit test command for changed modules.",
+                "Confirm all tests pass with no flaky reruns.",
+                "Verify targeted tests cover AI parsing, walkthrough, and state transitions.",
+            ],
+        },
+        "ui_constraints": {
+            "minimalist_layout_rules": [
+                "Single primary action per view",
+                "No non-essential panels",
+            ],
+            "system_theme_support": True,
+            "smartphone_frame_rule": "Enable smartphone frame only when demo_experience.device_target.is_mobile_like is true.",
         },
         "acceptance_tests": [
             {
@@ -250,6 +516,62 @@ def test_openai_compatible_schema_strips_keywords_from_refs() -> None:
     normalized = XToDemoPipelineService._openai_compatible_schema(raw_schema)
     assert normalized["properties"]["source"] == {"$ref": "#/$defs/SourceInfo"}
     assert "description" not in normalized["properties"]["source"]
+
+
+def test_openai_compatible_schema_handles_deep_nesting_and_ref_arrays() -> None:
+    raw_schema = {
+        "type": "object",
+        "properties": {
+            "tree": {
+                "type": "object",
+                "properties": {
+                    "level_2": {
+                        "type": "object",
+                        "properties": {
+                            "level_3": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/$defs/Leaf",
+                                    "description": "Leaf items in a nested array",
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "$defs": {
+            "Leaf": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "meta": {
+                        "type": "object",
+                        "properties": {"score": {"type": "number"}},
+                    },
+                },
+            }
+        },
+    }
+
+    normalized = XToDemoPipelineService._openai_compatible_schema(raw_schema)
+    assert normalized["additionalProperties"] is False
+    assert set(normalized["required"]) == {"tree"}
+    assert normalized["properties"]["tree"]["additionalProperties"] is False
+    assert set(normalized["properties"]["tree"]["required"]) == {"level_2"}
+    assert (
+        normalized["properties"]["tree"]["properties"]["level_2"]["additionalProperties"] is False
+    )
+    assert set(normalized["properties"]["tree"]["properties"]["level_2"]["required"]) == {"level_3"}
+
+    level_3_items = normalized["properties"]["tree"]["properties"]["level_2"]["properties"][
+        "level_3"
+    ]["items"]
+    assert level_3_items == {"$ref": "#/$defs/Leaf"}
+    assert normalized["$defs"]["Leaf"]["additionalProperties"] is False
+    assert set(normalized["$defs"]["Leaf"]["required"]) == {"name", "meta"}
+    assert normalized["$defs"]["Leaf"]["properties"]["meta"]["additionalProperties"] is False
+    assert set(normalized["$defs"]["Leaf"]["properties"]["meta"]["required"]) == {"score"}
 
 
 def test_wait_logging_reports_progress_at_intervals(monkeypatch, caplog, tmp_path) -> None:

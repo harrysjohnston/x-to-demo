@@ -23,7 +23,7 @@
     "lint:ci": "pnpm -C apps/web lint && python -m ruff check apps/api && python -m ruff format --check apps/api",
     "typecheck": "pnpm -C apps/web typecheck",
     "test": "pnpm -C apps/web test && python -m pytest -q -c apps/api/pyproject.toml apps/api",
-    "test:full": "echo '> Web unit' && pnpm -C apps/web test && echo '> Web e2e' && pnpm -C apps/web e2e && echo '> API' && python -m pytest -q -c apps/api/pyproject.toml apps/api",
+    "test:full": "echo '> Web unit' && pnpm -C apps/web test && echo '> Web e2e' && pnpm -C apps/web e2e && echo '> API' && (uv run --project apps/api pytest -q -c apps/api/pyproject.toml apps/api || python -m pytest -q -c apps/api/pyproject.toml apps/api)",
     "test:ci": "pnpm lint:ci && pnpm typecheck && pnpm test:full",
     "fix": "./scripts/precommit-fix",
     "deploy:configure": "./scripts/configure-deploy",

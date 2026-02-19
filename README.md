@@ -136,6 +136,7 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - One pipeline run produces one code spec artifact set.
 - Pipeline is synchronous per request.
 - Output is designed for demo-build handoff, not production architecture.
+- Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
 
 ## Related Docs
 
@@ -145,4 +146,4 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - Deployment: `/docs/deployment.md`
 - Architecture notes: `/architecture_decisions.md`
 
-Last reviewed: 2026-02-12
+Last reviewed: 2026-02-19

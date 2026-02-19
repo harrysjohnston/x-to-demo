@@ -9,12 +9,14 @@ test.describe("Homepage", () => {
 
   test("displays the main heading", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Your files, archived" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Turn input X into a runnable demo code spec/i }),
+    ).toBeVisible();
   });
 
   test("displays the description text", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText(/A minimal, secure space for your uploads/i)).toBeVisible();
+    await expect(page.getByText(/Upload or paste brainstorming input/i)).toBeVisible();
   });
 
   test("displays the auth form", async ({ page }) => {
