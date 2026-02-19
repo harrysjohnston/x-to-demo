@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .common import ArtifactBase, VersioningInfo
+from .common import ArtifactBase
 
 IOModality = Literal["text", "image", "audio", "video", "file", "mixed"]
 
@@ -156,13 +156,6 @@ class FeatureSpecArtifact(ArtifactBase):
     """Structured phase-1 artifact."""
 
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal["0.2"] = Field(
-        default="0.2",
-        description=(
-            "Schema version for this artifact payload. Older artifacts may not be "
-            "editable/resumable after schema upgrades."
-        ),
-    )
 
     intent: FeatureIntent = Field(description="Problem and goal framing.")
     external_behavior: ExternalBehavior = Field(description="Behavior contract summary.")
@@ -192,4 +185,3 @@ class FeatureSpecArtifact(ArtifactBase):
         default_factory=list,
         description="Signals indicating the feature achieved expected outcomes.",
     )
-    versioning: VersioningInfo = Field(description="Version metadata for this artifact.")

@@ -1,7 +1,14 @@
 """x-to-demo artifact schemas."""
 
 from .code_spec import AISeam, CodeSpecArtifact, StateModel, TechStack
-from .common import AcceptanceCriterion, ArtifactBase, ArtifactStatus, SourceInfo, VersioningInfo
+from .common import (
+    AcceptanceCriterion,
+    ArtifactBase,
+    ArtifactStatus,
+    SourceInfo,
+    SpecGenerationMetadata,
+    VersioningInfo,
+)
 from .demo_spec import DemoScope, DemoSpecArtifact
 from .feature_spec import ExternalBehavior, FeatureIntent, FeatureSpecArtifact
 
@@ -17,6 +24,7 @@ __all__ = [
     "FeatureIntent",
     "FeatureSpecArtifact",
     "SourceInfo",
+    "SpecGenerationMetadata",
     "StateModel",
     "TechStack",
     "VersioningInfo",

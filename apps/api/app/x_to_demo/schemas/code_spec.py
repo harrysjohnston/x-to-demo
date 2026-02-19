@@ -391,13 +391,6 @@ class CodeSpecArtifact(ArtifactBase):
     """Structured phase-3 artifact."""
 
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal["0.2"] = Field(
-        default="0.2",
-        description=(
-            "Schema version for this artifact payload. Older artifacts may not be "
-            "editable/resumable after schema upgrades."
-        ),
-    )
 
     demo_overview: str = Field(description="Implementation-oriented demo overview.")
     tech_stack: TechStack = Field(description="Stack constraints and compatibility requirements.")

@@ -55,13 +55,20 @@ def _build_service(*, output_dir, responses: list[_FakeResponse]) -> XToDemoPipe
 
 def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.2",
         "feature_name": feature_name,
-        "status": "draft",
-        "source": {
-            "x_source_type": "notes",
-            "inputs": ["x_input", "additional_context"],
-            "notes": "Synthetic payload for tests.",
+        "spec_generation_metadata": {
+            "schema_version": "0.2",
+            "status": "draft",
+            "source": {
+                "x_source_type": "notes",
+                "inputs": ["x_input", "additional_context"],
+                "notes": "Synthetic payload for tests.",
+            },
+            "versioning": {
+                "version": "0.1.0",
+                "changelog": ["Initial draft"],
+                "updated_at_utc": "2026-02-12T12:00:00Z",
+            },
         },
         "intent": {
             "problem": "Messy input causes ambiguous delivery intent.",
@@ -126,23 +133,25 @@ def _feature_spec_payload(feature_name: str = "Test Feature") -> dict[str, objec
         "excluded_plumbing": ["auth", "billing", "observability"],
         "invariants": ["Spec-first behaviour over implementation details."],
         "success_metrics": ["Required keys present in output JSON."],
-        "versioning": {
-            "version": "0.1.0",
-            "changelog": ["Initial draft"],
-            "updated_at_utc": "2026-02-12T12:00:00Z",
-        },
     }
 
 
 def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.2",
         "feature_name": feature_name,
-        "status": "draft",
-        "source": {
-            "x_source_type": "feature_spec",
-            "inputs": ["feature_spec"],
-            "notes": "Derived from phase 1.",
+        "spec_generation_metadata": {
+            "schema_version": "0.2",
+            "status": "draft",
+            "source": {
+                "x_source_type": "feature_spec",
+                "inputs": ["feature_spec"],
+                "notes": "Derived from phase 1.",
+            },
+            "versioning": {
+                "version": "0.1.0",
+                "changelog": ["Initial draft"],
+                "updated_at_utc": "2026-02-12T12:00:00Z",
+            },
         },
         "demo_overview": "Minimal demo proving the moment of value.",
         "demo_scope": {
@@ -282,13 +291,20 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
 
 def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
     return {
-        "schema_version": "0.2",
         "feature_name": feature_name,
-        "status": "draft",
-        "source": {
-            "x_source_type": "demo_spec",
-            "inputs": ["demo_spec"],
-            "notes": "Derived from phase 2.",
+        "spec_generation_metadata": {
+            "schema_version": "0.2",
+            "status": "draft",
+            "source": {
+                "x_source_type": "demo_spec",
+                "inputs": ["demo_spec"],
+                "notes": "Derived from phase 2.",
+            },
+            "versioning": {
+                "version": "0.1.0",
+                "changelog": ["Initial draft"],
+                "updated_at_utc": "2026-02-12T12:00:00Z",
+            },
         },
         "demo_overview": "Runnable frontend-only demo from the demo spec.",
         "tech_stack": {

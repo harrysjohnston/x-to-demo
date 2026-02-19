@@ -6,6 +6,7 @@ from app.x_to_demo.pipeline.models import PIPELINE_PHASES, PipelineRunInput
 from app.x_to_demo.pipeline.prompts import build_phase_prompts
 from app.x_to_demo.schemas.code_spec import CodeSpecArtifact
 from app.x_to_demo.schemas.demo_spec import DemoSpecArtifact
+from app.x_to_demo.schemas.feature_spec import FeatureSpecArtifact
 
 
 def _phase(key: str):
@@ -142,3 +143,16 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "api_usage_by_headline_item" in openai_required
     assert "covers_requires_voice" in openai_required
     assert "covers_requires_tool_loop" in openai_required
+
+
+def test_all_artifact_schemas_separate_spec_generation_metadata() -> None:
+    for model in (FeatureSpecArtifact, DemoSpecArtifact, CodeSpecArtifact):
+        schema = model.model_json_schema()
+        required = set(schema.get("required", []))
+        properties = schema.get("properties", {})
+
+        assert "spec_generation_metadata" in required
+        assert "schema_version" not in properties
+        assert "status" not in properties
+        assert "source" not in properties
+        assert "versioning" not in properties

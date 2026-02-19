@@ -25,6 +25,12 @@ def minimal_phase_inputs() -> tuple[PipelineRunInput, FeatureSpecArtifact, DemoS
     feature_spec = FeatureSpecArtifact.model_validate(
         {
             "feature_name": "",
+            "spec_generation_metadata": {
+                "schema_version": "0.2",
+                "status": "draft",
+                "source": {"x_source_type": "", "inputs": [], "notes": ""},
+                "versioning": {"version": "", "changelog": [], "updated_at_utc": ""},
+            },
             "intent": {"problem": "", "objective": "", "desired_outcome": "", "target_persona": ""},
             "external_behavior": {"inputs": [], "outputs": [], "states": [], "errors": []},
             "innovation_focus": {
@@ -69,13 +75,17 @@ def minimal_phase_inputs() -> tuple[PipelineRunInput, FeatureSpecArtifact, DemoS
             "excluded_plumbing": ["auth"],
             "invariants": [],
             "success_metrics": [],
-            "versioning": {"version": "", "changelog": [], "updated_at_utc": ""},
-            "source": {"x_source_type": "", "inputs": [], "notes": ""},
         }
     )
     demo_spec = DemoSpecArtifact.model_validate(
         {
             "feature_name": "",
+            "spec_generation_metadata": {
+                "schema_version": "0.2",
+                "status": "draft",
+                "source": {"x_source_type": "", "inputs": [], "notes": ""},
+                "versioning": {"version": "", "changelog": [], "updated_at_utc": ""},
+            },
             "demo_overview": "",
             "demo_scope": {"in_scope": [], "out_of_scope": []},
             "demo_format": "",
@@ -164,7 +174,6 @@ def minimal_phase_inputs() -> tuple[PipelineRunInput, FeatureSpecArtifact, DemoS
             "core_flow_steps": [],
             "success_signals": [],
             "example_copy": [],
-            "source": {"x_source_type": "", "inputs": [], "notes": ""},
         }
     )
     return run_input, feature_spec, demo_spec

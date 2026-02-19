@@ -290,13 +290,6 @@ class DemoSpecArtifact(ArtifactBase):
     """Structured phase-2 artifact."""
 
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal["0.2"] = Field(
-        default="0.2",
-        description=(
-            "Schema version for this artifact payload. Older artifacts may not be "
-            "editable/resumable after schema upgrades."
-        ),
-    )
 
     demo_overview: str = Field(description="One-paragraph description of the demo outcome.")
     demo_scope: DemoScope = Field(
