@@ -37,8 +37,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="x-to-demo API", description="Application name")
     app_version: str = Field(default="0.0.0", description="Application version")
     app_description: str = Field(
-        default="FastAPI + SQLModel API scaffold for the fullstack template",
-        description="Application description",
+        default="Local x-to-demo API", description="Application description"
     )
     environment: str = Field(
         default="development",
@@ -61,104 +60,10 @@ class Settings(BaseSettings):
         """Parse CORS origins from various formats."""
         return parse_cors_origins(value)
 
-    # JWT settings
-    jwt_secret: str = Field(
-        default="dev-change-me",
-        description="JWT signing secret (MUST be changed in production)",
-    )
-    jwt_issuer: str = Field(
-        default="x-to-demo",
-        description="JWT issuer claim",
-    )
-    jwt_audience: str = Field(
-        default="x-to-demo",
-        description="JWT audience claim",
-    )
-    jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm")
-    jwt_access_token_expire_minutes: int = Field(
-        default=30,
-        description="JWT access token expiration in minutes",
-    )
-    jwt_refresh_token_expire_days: int = Field(
-        default=7,
-        description="JWT refresh token expiration in days",
-    )
-
-    # Database settings
-    database_url: str | None = Field(
-        default=None,
-        description="PostgreSQL database URL (overrides individual postgres_* settings)",
-    )
-    postgres_user: str = Field(default="app", description="PostgreSQL user")
-    postgres_password: str = Field(default="app", description="PostgreSQL password")
-    postgres_db: str = Field(default="app", description="PostgreSQL database name")
-    postgres_host: str = Field(default="localhost", description="PostgreSQL host")
-    postgres_port: int = Field(default=5432, description="PostgreSQL port")
-
-    def get_database_url(self) -> str:
-        """Get database URL from settings or construct from components."""
-        if self.database_url:
-            return self.database_url
-        return f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-
     # Logging
     log_level: str = Field(
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
-    )
-
-    # Email (dev sink)
-    email_enabled: bool = Field(
-        default=True,
-        description="Enable email rendering and dev delivery",
-    )
-    email_from_address: str = Field(
-        default="no-reply@local",
-        description="Default from address for emails",
-    )
-    email_from_name: str = Field(
-        default="x-to-demo",
-        description="Default from name for emails",
-    )
-    email_web_base_url: str = Field(
-        default="http://localhost:3000",
-        description="Base URL for frontend links in emails",
-    )
-    email_support_address: str = Field(
-        default="support@local",
-        description="Support contact for customer emails",
-    )
-    email_log_payload: bool = Field(
-        default=True,
-        description="Log rendered email content to the console sink",
-    )
-
-    # Storage settings
-    storage_provider: str = Field(
-        default="s3",
-        description="Storage provider (s3 | gcs | azure)",
-    )
-    s3_bucket: str = Field(default="", description="S3 bucket name")
-    s3_region: str = Field(default="us-east-1", description="S3 region")
-    s3_endpoint_url: str | None = Field(
-        default=None,
-        description="S3 endpoint URL (for MinIO: http://localhost:9000)",
-    )
-    s3_access_key_id: str | None = Field(
-        default=None,
-        description="S3 access key ID",
-    )
-    s3_secret_access_key: str | None = Field(
-        default=None,
-        description="S3 secret access key",
-    )
-    upload_max_size_bytes: int = Field(
-        default=10 * 1024 * 1024,
-        description="Maximum upload size in bytes (default: 10 MB)",
-    )
-    upload_url_expires_seconds: int = Field(
-        default=900,
-        description="Presigned URL expiration time in seconds (default: 15 minutes)",
     )
 
     # OpenAI / X-to-Demo pipeline

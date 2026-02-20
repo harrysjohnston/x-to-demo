@@ -1,55 +1,26 @@
 # Web (`apps/web`)
 
-Next.js + TypeScript frontend for the fullstack template. Use this app as the web client when bootstrapping or extending the template.
+Next.js frontend for local x-to-demo pipeline runs.
 
-## What’s included
+## Features
 
-- **Next.js** – App Router, TypeScript
-- **UI** – shadcn/ui, Tailwind CSS
-- **Auth** – Login/register UI, token handling, protected flows
-- **Uploads** – File upload component and gallery, presigned URL flow
-- **Realtime** – SSE hook (`useSSE`) for live updates
-- **API client** – Typed helpers and auth-aware requests
-- **Testing** – Vitest (unit), Playwright (e2e)
+- Input X capture and pipeline execution
+- Per-phase artifact inspection/editing
+- Resume and artifact download actions
 
-## Development
-
-### First run (no Docker)
+## Run
 
 ```bash
-# From repository root
-pnpm install
-cd apps/web
-pnpm dev
+pnpm -C apps/web dev
 ```
 
-Set `NEXT_PUBLIC_API_URL` to your API base (default `http://localhost:8000/api/v1`). You can put it in the root `.env` for local dev.
+Set `NEXT_PUBLIC_API_URL` to your API base (default `http://localhost:8000/api/v1`).
 
-### Run with the full stack
-
-From the repo root, `pnpm dev:full` starts the API, web app, db, MinIO, and MailHog. Then open http://localhost:3000.
-
-### Tests
+## Test and lint
 
 ```bash
-# Unit tests
-pnpm test
-
-# E2E (Playwright)
-pnpm e2e
+pnpm -C apps/web lint
+pnpm -C apps/web typecheck
+pnpm -C apps/web test
+pnpm -C apps/web e2e
 ```
-
-### Lint and typecheck
-
-```bash
-pnpm lint
-pnpm typecheck
-```
-
-## Project layout
-
-- `app/` – Pages, layout, globals
-- `components/` – AuthForm, AuthSection, FileUpload, FileGallery, UI primitives
-- `lib/` – api client, auth helpers, upload, SSE client, utils
-- `hooks/` – useSSE
-- `tests-e2e/` – Playwright specs

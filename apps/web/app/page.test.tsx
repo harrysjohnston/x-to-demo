@@ -19,10 +19,8 @@ describe("HomePage", () => {
     expect(screen.getByText(/Upload or paste brainstorming input/i)).toBeInTheDocument();
   });
 
-  it("renders the auth buttons", () => {
+  it("renders the pipeline action", () => {
     render(<HomePage />);
-    // There are multiple "Sign in" buttons, so use getAllByText
-    expect(screen.getAllByText("Sign in").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Create account").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Run pipeline/i })).toBeInTheDocument();
   });
 });

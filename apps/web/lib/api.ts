@@ -8,8 +8,6 @@
  * - Provides typed request/response handling
  */
 
-import { AUTH_ACCESS_TOKEN_KEY } from "./storage-keys";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export interface ErrorDetail {
@@ -42,8 +40,8 @@ export interface RequestOptions extends RequestInit {
 
 /**
  * Builds a URL with query parameters.
- * Path is appended to the base (so "/uploads" with base "http://localhost:8000/api/v1"
- * becomes "http://localhost:8000/api/v1/uploads", not "http://localhost:8000/uploads").
+ * Path is appended to the base (so "/x-to-demo/runs" with base "http://localhost:8000/api/v1"
+ * becomes "http://localhost:8000/api/v1/x-to-demo/runs", not "http://localhost:8000/x-to-demo/runs").
  */
 function buildUrl(
   path: string,
@@ -136,12 +134,6 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } else {
       Object.assign(headers, fetchOptions.headers);
     }
-  }
-
-  // Add Authorization header if token is available
-  const token = typeof window !== "undefined" ? localStorage.getItem(AUTH_ACCESS_TOKEN_KEY) : null;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
   }
 
   try {

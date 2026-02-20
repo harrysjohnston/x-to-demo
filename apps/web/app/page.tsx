@@ -1,4 +1,4 @@
-import { AuthSection } from "@/components/AuthSection";
+import { XToDemoStudio } from "@/components/XToDemoStudio";
 
 export default function HomePage() {
   return (
@@ -24,9 +24,9 @@ export default function HomePage() {
             code spec aligned to the master plan and sub-plans.
           </p>
 
-          {/* Auth section with staggered animation */}
+          {/* Pipeline studio */}
           <div className="animate-fade-up stagger-3">
-            <AuthSection />
+            <XToDemoStudio />
           </div>
         </div>
       </div>

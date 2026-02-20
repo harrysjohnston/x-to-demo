@@ -1,5 +1,4 @@
 import { api } from "@/lib/api";
-import { AUTH_ACCESS_TOKEN_KEY } from "@/lib/storage-keys";
 
 export const X_TO_DEMO_MODELS = [
   "gpt-5.2",
@@ -106,10 +105,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/a
 
 async function fetchBinary(path: string): Promise<Blob> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const token = typeof window !== "undefined" ? localStorage.getItem(AUTH_ACCESS_TOKEN_KEY) : null;
   const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 
   if (!response.ok) {

@@ -6,154 +6,57 @@ on:
 
 jobs:
   web:
-    name: Web (Biome + Vitest + Playwright)
+    name: Web (lint + typecheck + unit + e2e)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - uses: pnpm/action-setup@v4
-      - name: Install
+      - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Biome (lint)
-        run: pnpm lint
+        run: pnpm -C apps/web lint
       - name: TypeScript (typecheck)
-        run: pnpm typecheck
-      - name: Vitest (unit tests)
-        run: pnpm test
+        run: pnpm -C apps/web typecheck
+      - name: Vitest (unit)
+        run: pnpm -C apps/web test
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
-      - name: Playwright (e2e tests)
-        run: pnpm e2e
+        run: pnpm -C apps/web exec playwright install --with-deps
+      - name: Playwright (e2e)
+        run: pnpm -C apps/web e2e
 
   api:
-    name: API (Ruff + Pytest)
+    name: API (ruff + pytest)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - name: Install
-        run: uv pip install --system -e ".[dev]"
+      - uses: astral-sh/setup-uv@v5
       - name: Ruff (format check)
-        run: python -m ruff format --check .
+        run: uv run --project apps/api --extra dev python -m ruff format --check apps/api/app apps/api/tests
       - name: Ruff (lint)
-        run: python -m ruff check .
+        run: uv run --project apps/api --extra dev python -m ruff check apps/api/app apps/api/tests
       - name: Pytest
-        run: python -m pytest -q
-
-  docker:
-    name: Docker Build Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API production image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          target: production
-          push: false
-          load: true
-          tags: x-to-demo-api:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build Web production image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          target: production
-          push: false
-          load: true
-          tags: x-to-demo-web:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test API image health
-        run: |
-          docker run -d --name api-test -p 8000:8000 \
-            -e DATABASE_URL=sqlite:///./test.db \
-            -e JWT_SECRET=test-secret \
-            x-to-demo-api:test
-          sleep 10
-          curl -f http://localhost:8000/health || exit 1
-          docker logs api-test
-          docker stop api-test
-
-      - name: Test Web image startup
-        run: |
-          docker run -d --name web-test -p 3000:3000 \
-            -e NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 \
-            x-to-demo-web:test
-          sleep 15
-          # Check that the container is still running (didn't crash)
-          docker ps | grep web-test || exit 1
-          docker logs web-test
-          docker stop web-test
-
-  terraform:
-    name: Terraform Validate
-    if: false  # Terraform job disabled
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra/terraform
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~> 1.5"
-
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-
-      - name: Terraform Init
-        run: terraform init -backend=false
-
-      - name: Terraform Validate
-        run: terraform validate
+        run: uv run --project apps/api --extra dev python -m pytest -q -c apps/api/pyproject.toml apps/api/tests
 
   pre-commit:
     name: pre-commit (all hooks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - uses: pnpm/action-setup@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
+      - uses: astral-sh/setup-uv@v5
       - name: Install dependencies
-        run: |
-          pnpm install --no-frozen-lockfile
-          uv pip install --system -e "apps/api[dev]"
-
+        run: pnpm install --no-frozen-lockfile
       - name: Run pre-commit
-        run: python -m pre_commit run --all-files --show-diff-on-failure
+        run: uv run --project apps/api --extra dev python -m pre_commit run --all-files --show-diff-on-failure

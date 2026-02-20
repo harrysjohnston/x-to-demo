@@ -1,39 +1,33 @@
 #!/usr/bin/env bash
-# Reproduce CI Docker build test and pre-commit jobs locally.
-# Run from repo root. Matches .github/workflows/ci.yml behavior.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 usage() {
-  cat <<'EOF'
-Usage: scripts/ci-local [--pre-commit|--docker|--help]
+  cat <<'USAGE'
+Usage: scripts/ci-local [--pre-commit|--checks]
 
-Reproduce CI failures locally before pushing. By default runs both jobs.
+Runs the retained CI jobs locally.
 
-  --pre-commit   Run only the pre-commit job (all hooks, all files)
-  --docker       Run only the Docker build + health test job
-  --help         Show this help
-
-Why CI might fail locally:
-  - pre-commit: CI runs `--all-files`; local `pre-commit run` only checks staged files
-  - pre-commit: CI installs deps from repo root (pnpm + uv --system); venv/versions may differ
-  - docker: CI uses ubuntu-latest; platform/arch differences can cause build/runtime issues
-EOF
+  --checks      Run lint, typecheck, and tests (default)
+  --pre-commit  Run pre-commit on all files
+USAGE
 }
 
-RUN_PRECOMMIT=true
-RUN_DOCKER=true
+RUN_CHECKS=true
+RUN_PRECOMMIT=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --pre-commit)
-      RUN_DOCKER=false
+    --checks)
+      RUN_CHECKS=true
+      RUN_PRECOMMIT=false
       shift
       ;;
-    --docker)
-      RUN_PRECOMMIT=false
+    --pre-commit)
+      RUN_CHECKS=false
+      RUN_PRECOMMIT=true
       shift
       ;;
     -h|--help)
@@ -41,75 +35,21 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown option: $1"
+      echo "Unknown option: $1" >&2
       usage
       exit 1
       ;;
   esac
 done
 
-cleanup_docker() {
-  docker stop api-test 2>/dev/null || true
-  docker rm api-test 2>/dev/null || true
-  docker stop web-test 2>/dev/null || true
-  docker rm web-test 2>/dev/null || true
-}
+pnpm install --no-frozen-lockfile
 
-# --- Pre-commit job (matches ci.yml pre-commit job) ---
-run_precommit() {
-  echo "=== Pre-commit (all hooks, all files) ==="
-  echo "Installing dependencies (matches CI)..."
-  pnpm install --no-frozen-lockfile
-  uv pip install --system -e "apps/api[dev]"
-  echo "Running pre-commit on all files..."
-  python -m pre_commit run --all-files --show-diff-on-failure
-  echo "Pre-commit passed."
-}
+if [[ "$RUN_CHECKS" == "true" ]]; then
+  pnpm lint:ci
+  pnpm typecheck
+  pnpm test
+fi
 
-# --- Docker job (matches ci.yml docker job) ---
-run_docker() {
-  echo "=== Docker Build Test ==="
-  cleanup_docker
-
-  echo "Building API production image..."
-  docker build -f apps/api/Dockerfile --target production -t x-to-demo-api:test .
-
-  echo "Building Web production image..."
-  docker build -f apps/web/Dockerfile --target production -t x-to-demo-web:test .
-
-  echo "Testing API image health..."
-  docker run -d --name api-test -p 8000:8000 \
-    -e DATABASE_URL=sqlite:///./test.db \
-    -e JWT_SECRET=test-secret \
-    x-to-demo-api:test
-  sleep 10
-  curl -f http://localhost:8000/health || {
-    echo "API health check failed. Container logs:"
-    docker logs api-test
-    cleanup_docker
-    exit 1
-  }
-  docker stop api-test
-  docker rm api-test
-
-  echo "Testing Web image startup..."
-  docker run -d --name web-test -p 3000:3000 \
-    -e NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 \
-    x-to-demo-web:test
-  sleep 15
-  if ! docker ps | grep -q web-test; then
-    echo "Web container exited. Logs:"
-    docker logs web-test
-    cleanup_docker
-    exit 1
-  fi
-  docker logs web-test
-  cleanup_docker
-  echo "Docker build test passed."
-}
-
-FAILED=0
-$RUN_PRECOMMIT && { run_precommit || FAILED=1; }
-$RUN_DOCKER && { run_docker || FAILED=1; }
-
-exit $FAILED
+if [[ "$RUN_PRECOMMIT" == "true" ]]; then
+  uv run --project apps/api --extra dev python -m pre_commit run --all-files --show-diff-on-failure
+fi

@@ -1,177 +1,78 @@
 # x-to-demo
 
-`x-to-demo` turns raw Input X into a runnable-demo code spec via a three-phase, opinionated pipeline.
+`x-to-demo` turns raw Input X into structured specifications through a three-phase pipeline.
 
-## What It Does
+## What is retained
 
-- Accepts raw Input X from the web app (notes, docs, tickets, emails, transcripts, and similar text input).
-- Runs a chained LLM pipeline (Responses API) across three major phases:
-- Phase 1: Input -> SDD Feature Spec
-- Phase 2: Feature Spec -> Demo Spec
-- Phase 3: Demo Spec -> Code Spec
-- Returns all phase artifacts in the UI.
-- Saves phase markdown outputs and the final code spec to disk.
+- Local web app (`apps/web`) for running pipeline jobs and reviewing artifacts.
+- Local API (`apps/api`) that runs the x-to-demo pipeline and saves artifacts.
+- Pipeline schemas, canonical JSON/XML rendering, and resumable run artifacts.
+- Web/API tests, linting, and pre-commit checks.
 
-## Quick Start
+## What was removed
 
-1. Copy environment config.
+- Auth and users
+- Database and migrations
+- Upload/storage services (S3/MinIO)
+- Email pipeline
+- Deployment/infra template assets
+
+## Quick start
+
+1. Create env file:
 
 ```bash
 cp config/env.example .env
 ```
 
-2. Set your OpenAI key in `.env`.
+2. Set your OpenAI key in `.env`:
 
 ```bash
 OPENAI_API_KEY=<your-key>
 ```
 
-3. Start the stack.
+3. Start local stack:
 
 ```bash
-pnpm dev:full
+pnpm dev
 ```
 
 4. Open:
+
 - Web: `http://localhost:3000`
 - API docs: `http://localhost:8000/docs`
 
-## Using The Product
+## API surface
 
-1. Register or sign in on the landing page.
-2. Upload an Input X file or paste raw Input X text into the `Input X` panel.
-3. Optionally provide:
-- `Feature name hint`
-- `Additional context`
-4. Click `Run pipeline`.
-5. Review phase artifacts and copy the final code spec.
-6. Find saved artifacts under `artifacts/x-to-demo/<run-id>/` (or your configured output dir).
+- `GET /health`
+- `POST /api/v1/x-to-demo/runs`
+- `GET /api/v1/x-to-demo/runs/{run_id}`
+- `GET /api/v1/x-to-demo/runs/{run_id}/artifacts/{phase_key}`
+- `PUT /api/v1/x-to-demo/runs/{run_id}/artifacts/{phase_key}`
+- `POST /api/v1/x-to-demo/runs/{run_id}/resume`
+- `GET /api/v1/x-to-demo/runs/{run_id}/artifacts/{phase_key}/download`
+- `GET /api/v1/x-to-demo/runs/{run_id}/download`
 
-## API Endpoint
+All endpoints are local-only and unauthenticated.
 
-`POST /api/v1/x-to-demo/runs` (auth required)
+## Artifacts
 
-Request body:
-
-```json
-{
-  "x_input": "Raw Input X text...",
-  "additional_context": "Optional constraints/context",
-  "feature_name_hint": "Optional feature label",
-  "model": "gpt-5.2",
-  "reasoning_effort": "high"
-}
-```
-
-Response (enveloped):
-
-- `run_id`
-- `created_at`
-- `model`
-- `reasoning_effort`
-- `artifacts[]` (`phase_key`, `title`, `markdown`, `saved_path`)
-- `final_code_spec`
-- `final_code_spec_path`
-
-## Artifact Persistence
-
-Default location:
+By default, artifacts are written under:
 
 `artifacts/x-to-demo/<run-id>/`
 
-Typical files:
+Configure with `X_TO_DEMO_OUTPUT_DIR`.
 
-- `01-phase-1-input-to-feature-spec.md`
-- `02-phase-2-feature-spec-to-demo-spec.md`
-- `03-phase-3-demo-spec-to-code-spec.md`
-- `run-manifest.json`
-
-Note: phase order is defined by artifact ordering and titles.
-
-Configure output path with `X_TO_DEMO_OUTPUT_DIR`.
-
-## Project Structure
-
-```text
-apps/web/                  # Next.js frontend (auth + pipeline workspace UI)
-apps/api/                  # FastAPI backend (auth, pipeline endpoint, persistence)
-apps/api/app/services/     # X-to-Demo pipeline orchestration service
-.plans/                    # Master plan + sub-plans
-.plans/milestones/         # Milestone trackers for plan execution
-config/env.example         # Environment variable template
-```
-
-## Environment Variables (Pipeline)
-
-- `OPENAI_API_KEY` (required)
-- `X_TO_DEMO_MODEL` (default: `gpt-5.1`; supported: `gpt-5.2`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1-nano`)
-- `X_TO_DEMO_OUTPUT_DIR` (default: `artifacts/x-to-demo`)
-- `X_TO_DEMO_STORE_RESPONSES` (default: `false`)
-- `X_TO_DEMO_MAX_INPUT_CHARS` (default: `60000`)
-- Per-run `reasoning_effort` (optional): for `gpt-5.2` use `none|low|medium|high|xhigh`; for other GPT-5 models use `minimal|low|medium|high`
-
-## Local Development Commands
-
-- `pnpm dev` -> web + api
-- `pnpm dev:db` -> web + api + db
-- `pnpm dev:full` -> web + api + db + storage + MailHog
-- `pnpm dev:down` -> stop all dev services
-
-## Tests And Lint
+## Local checks
 
 ```bash
-# Web
-pnpm -C apps/web lint
-pnpm -C apps/web typecheck
-pnpm -C apps/web test
-
-# API
-uv run ruff check apps/api/app apps/api/tests
-uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
+pnpm lint
+pnpm typecheck
+pnpm test
 ```
 
-### Reproduce CI Locally
-
-To reproduce the Docker build test and pre-commit hooks that run on PRs:
+Run pre-commit hooks over all files:
 
 ```bash
-pnpm ci:local
+uv run --project apps/api --extra dev python -m pre_commit run --all-files
 ```
-
-Or run individual jobs:
-
-```bash
-./scripts/ci-local --pre-commit   # pre-commit on all files (CI checks everything, not just staged)
-./scripts/ci-local --docker       # Docker build + health checks
-```
-
-**Why CI might fail when local checks pass:**
-
-- **Pre-commit**: CI runs `pre_commit run --all-files`; a normal `pre-commit run` only checks staged files, so unstaged or untracked issues are missed.
-- **Pre-commit**: CI installs deps from repo root with `uv pip install --system`; your venv or tool versions may differ.
-- **Docker**: CI runs on `ubuntu-latest`; platform/arch differences (e.g. macOS vs Linux) can cause build or runtime failures.
-
-## Current Prototype Constraints
-
-- Input X currently optimized for text-like raw inputs.
-- One pipeline run produces one code spec artifact set.
-- Pipeline is synchronous per request.
-- Output is designed for demo-build handoff, not production architecture.
-- Phase-2 `DemoSpec` artifacts now require `interaction_contracts` that enumerate every per-screen interactive control with behavior, observable effects, enable/disable rules, and loading-state expectations.
-- Phase-2 `DemoSpec` artifacts now require `synthetic_demo_inputs.required_assets` (empty list allowed) to inventory every required synthetic text/image/audio asset with purpose, usage mapping, format/size constraints, and explicit synthetic labels.
-- Phase-3 `CodeSpec` artifacts now require `asset_generation_plan` describing per-modality OpenAI API/model choices, local generation scripts/commands, repo storage/naming, app loading/labeling behavior, mandatory guardrails, and `no_live_generation_on_startup=true`.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.interaction_test_matrix` that maps each control id to enabled/disabled/loading assertions under the no-inert-controls rule.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.synthetic_assets_validation` proving synthetic assets exist, pass basic file sanity checks, and that seeded startup flows do not depend on live generation calls.
-- Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
-- Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
-
-## Related Docs
-
-- Master plan: `/.plans/x-to-demo-master-plan.md`
-- Pipeline simplification plan: `/.plans/x-to-demo-pipeline-simplification.md`
-- Output contracts: `/.plans/x-to-demo-output-contracts.md`
-- Deployment: `/docs/deployment.md`
-- Architecture notes: `/architecture_decisions.md`
-
-Last reviewed: 2026-02-20

@@ -1,25 +1,14 @@
 [project]
 name = "apps-api"
 version = "0.0.0"
-description = "FastAPI + SQLModel API scaffold for the fullstack template"
+description = "FastAPI API for local x-to-demo pipeline execution"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
-  "sqlmodel>=0.0.22",
-  "psycopg[binary]>=3.2",
-  "alembic>=1.13",
-  "python-jose[cryptography]>=3.3",
-  "passlib[bcrypt]>=1.7.4",
-  "bcrypt>=4.0,<4.1",
-  "jinja2>=3.1",
-  "mjml",
   "pydantic-settings>=2.5",
-  "boto3>=1.35",
   "openai>=1.109.0",
   "colorlog>=6.8",
-  "pre-commit>=4.5.1",
-  "ruff>=0.14.14",
   "xmltodict>=0.13",
 ]
 

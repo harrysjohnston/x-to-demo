@@ -35,17 +35,6 @@ vi.mock("@/lib/x-to-demo", async () => {
 
 const mockedRunXToDemoPipeline = vi.mocked(runXToDemoPipeline);
 
-vi.mock("@/hooks/useSSE", () => ({
-  useSSE: vi.fn(() => ({
-    status: "disconnected",
-    lastEvent: null,
-    events: [],
-    disconnect: vi.fn(),
-    reconnect: vi.fn(),
-    clearEvents: vi.fn(),
-  })),
-}));
-
 const fakeResponse = {
   run_id: "run-test-1",
   created_at: "2026-02-12T12:00:00Z",

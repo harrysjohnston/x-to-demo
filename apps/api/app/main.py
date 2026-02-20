@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import setup_exception_handlers
-from app.routers import auth, sse, uploads, users, x_to_demo
+from app.routers import x_to_demo
 
 _LOG_STANDARD = {
     "name",
@@ -54,20 +54,6 @@ root.setLevel(_log_level)
 for h in root.handlers:
     h.setFormatter(_formatter)
 
-
-class _SSEEndpointFilter(logging.Filter):
-    """Filter out access logs for GET /api/v1/sse/events to avoid log spam from long-lived SSE connections."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        # uvicorn.access logs (client_addr, method, full_path, http_version, status_code) in record.args
-        if not getattr(record, "args", None) or len(record.args) < 5:
-            return True
-        path = record.args[2] if isinstance(record.args[2], str) else ""
-        return "/sse/events" not in path
-
-
-logging.getLogger("uvicorn.access").addFilter(_SSEEndpointFilter())
-
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
@@ -81,7 +67,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,  # Required for SSE cookie auth
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -90,10 +76,6 @@ app.add_middleware(
 setup_exception_handlers(app)
 
 # Include routers with API version prefix
-app.include_router(users.router, prefix="/api/v1")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(sse.router, prefix="/api/v1")
-app.include_router(uploads.router, prefix="/api/v1")
 app.include_router(x_to_demo.router, prefix="/api/v1")
 
 
