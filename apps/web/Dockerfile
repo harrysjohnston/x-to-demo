@@ -70,7 +70,7 @@ RUN pnpm install --filter @apps/web... --frozen-lockfile --prod
 # Copy built application from builder
 COPY --from=builder --chown=appuser:appuser /app/apps/web/.next /app/apps/web/.next
 COPY --from=builder --chown=appuser:appuser /app/apps/web/public /app/apps/web/public
-COPY --chown=appuser:appuser apps/web/next.config.ts /app/apps/web/
+COPY --chown=appuser:appuser apps/web/next.config.mjs /app/apps/web/
 
 # Switch to non-root user
 USER appuser

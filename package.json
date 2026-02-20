@@ -25,6 +25,7 @@
     "test": "pnpm -C apps/web test && python -m pytest -q -c apps/api/pyproject.toml apps/api",
     "test:full": "echo '> Web unit' && pnpm -C apps/web test && echo '> Web e2e' && pnpm -C apps/web e2e && echo '> API' && uv run --project apps/api --extra dev python -m pytest -q -c apps/api/pyproject.toml apps/api",
     "test:ci": "pnpm lint:ci && pnpm typecheck && pnpm test:full",
+    "ci:local": "./scripts/ci-local",
     "fix": "./scripts/precommit-fix",
     "deploy:configure": "./scripts/configure-deploy",
     "storage:setup": "python3 scripts/create-s3-bucket"

@@ -130,6 +130,27 @@ uv run ruff check apps/api/app apps/api/tests
 uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 ```
 
+### Reproduce CI Locally
+
+To reproduce the Docker build test and pre-commit hooks that run on PRs:
+
+```bash
+pnpm ci:local
+```
+
+Or run individual jobs:
+
+```bash
+./scripts/ci-local --pre-commit   # pre-commit on all files (CI checks everything, not just staged)
+./scripts/ci-local --docker       # Docker build + health checks
+```
+
+**Why CI might fail when local checks pass:**
+
+- **Pre-commit**: CI runs `pre_commit run --all-files`; a normal `pre-commit run` only checks staged files, so unstaged or untracked issues are missed.
+- **Pre-commit**: CI installs deps from repo root with `uv pip install --system`; your venv or tool versions may differ.
+- **Docker**: CI runs on `ubuntu-latest`; platform/arch differences (e.g. macOS vs Linux) can cause build or runtime failures.
+
 ## Current Prototype Constraints
 
 - Input X currently optimized for text-like raw inputs.
