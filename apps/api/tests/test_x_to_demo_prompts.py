@@ -300,11 +300,24 @@ def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> Non
     }
 
 
+def test_feature_spec_schema_requires_unsupported_input_type_short_circuit() -> None:
+    schema = FeatureSpecArtifact.model_json_schema()
+    innovation_focus_ref = schema["properties"]["innovation_focus"]["$ref"].split("/")[-1]
+    innovation_focus_schema = schema["$defs"][innovation_focus_ref]
+    guardrails_ref = innovation_focus_schema["properties"]["guardrails_summary"]["$ref"].split("/")[
+        -1
+    ]
+    guardrails_schema = schema["$defs"][guardrails_ref]
+
+    assert "unsupported_input_type_short_circuit" in guardrails_schema["properties"]
+
+
 def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     schema = DemoSpecArtifact.model_json_schema()
     required = set(schema.get("required", []))
 
     assert "synthetic_demo_inputs" in required
+    assert "runtime_input_and_guardrails" in schema["properties"]
     assert "consistency_trace" in required
     assert "tooling_decision_trace" in required
     assert "interaction_requirements" in required
@@ -334,6 +347,11 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     synthetic_inputs_name = schema["properties"]["synthetic_demo_inputs"]["$ref"].split("/")[-1]
     synthetic_inputs_schema = schema["$defs"][synthetic_inputs_name]
     assert "required_assets" in set(synthetic_inputs_schema.get("required", []))
+    assert "default_first_run_inputs" not in synthetic_inputs_schema["properties"]
+    assert "input_presets" in synthetic_inputs_schema["properties"]
+    assert "default_selected_preset_id" in synthetic_inputs_schema["properties"]
+    assert "preset_application_behavior" in synthetic_inputs_schema["properties"]
+    assert "preset_execution_behavior" in synthetic_inputs_schema["properties"]
 
     asset_name = synthetic_inputs_schema["properties"]["required_assets"]["items"]["$ref"].split(
         "/"
@@ -351,11 +369,31 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     }
     assert required_asset_schema["properties"]["must_be_labeled_synthetic"]["const"] is True
 
+    runtime_guardrails_name = schema["properties"]["runtime_input_and_guardrails"]["$ref"].split(
+        "/"
+    )[-1]
+    runtime_guardrails_schema = schema["$defs"][runtime_guardrails_name]
+    assert "accepts_runtime_inputs" in runtime_guardrails_schema["properties"]
+    assert "cancel_flow_behavior" in runtime_guardrails_schema["properties"]
+    assert "guardrails_pipeline_summary" in runtime_guardrails_schema["properties"]
+    assert "input_capture_summary" in runtime_guardrails_schema["properties"]
+    assert "presets_go_through_same_guardrails" in runtime_guardrails_schema["properties"]
+    assert "relevance_check_summary" in runtime_guardrails_schema["properties"]
+    assert "safety_check_summary" in runtime_guardrails_schema["properties"]
+    assert "supported_input_modalities" in runtime_guardrails_schema["properties"]
+    assert "user_visible_outcomes_on_reject" in runtime_guardrails_schema["properties"]
+    assert runtime_guardrails_schema["properties"]["accepts_runtime_inputs"]["const"] is True
+    assert (
+        runtime_guardrails_schema["properties"]["presets_go_through_same_guardrails"]["const"]
+        is True
+    )
+
 
 def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> None:
     schema = CodeSpecArtifact.model_json_schema()
     required = set(schema.get("required", []))
 
+    assert "agent_skills_to_apply" in schema["properties"]
     assert "synthetic_data_implementation" in required
     assert "asset_generation_plan" in required
     assert "consistency_trace" in required
@@ -368,6 +406,16 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "covers_requires_voice" in openai_required
     assert "covers_requires_tool_loop" in openai_required
     assert "request_validation" in openai_required
+
+    ai_seam_ref = schema["properties"]["ai_seam"]["$ref"].split("/")[-1]
+    ai_seam_schema = schema["$defs"][ai_seam_ref]
+    guardrails_ref = ai_seam_schema["properties"]["guardrails"]["$ref"].split("/")[-1]
+    guardrails_schema = schema["$defs"][guardrails_ref]
+    assert "runtime_guardrails_plan" in guardrails_schema["properties"]
+
+    testing_ref = schema["properties"]["testing_strategy"]["$ref"].split("/")[-1]
+    testing_schema = schema["$defs"][testing_ref]
+    assert "preset_inputs_integration_coverage" in testing_schema["properties"]
 
 
 def test_all_artifact_schemas_separate_spec_generation_metadata() -> None:
