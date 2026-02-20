@@ -41,6 +41,7 @@ export interface XToDemoArtifact {
   markdown: string;
   saved_path: string;
   json_path: string;
+  xml_path: string;
   json_content: Record<string, unknown>;
   content_hash: string;
 }
@@ -65,6 +66,7 @@ export interface XToDemoPhaseStatus {
   status: "pending" | "running" | "completed" | "failed" | "stale";
   input_artifact_ref?: XToDemoPhaseKey | null;
   output_json_path?: string | null;
+  output_xml_path?: string | null;
   output_md_path?: string | null;
   content_hash?: string | null;
   error?: string | null;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import re
 import zipfile
@@ -58,7 +59,6 @@ from app.x_to_demo.pipeline.responses import (
     extract_usage,
     response_to_dict,
 )
-from app.x_to_demo.renderers import parse_markdown_to_model
 
 if TYPE_CHECKING:
     import asyncio
@@ -355,23 +355,41 @@ class XToDemoPipelineService:
 
         if json_content is not None:
             output_model = phase.output_model.model_validate(json_content)
+            artifact = self._persist_phase_output(
+                run_dir=run_dir,
+                phase=phase,
+                output_model=output_model,
+            )
+            self._mark_phase_completed(
+                manifest=manifest,
+                phase=phase,
+                artifact=artifact,
+                input_artifact_ref=self._previous_phase_key(phase_key),
+                is_resume=True,
+            )
+            self._mark_downstream_stale(manifest=manifest, phase_key=phase_key)
         else:
             assert markdown is not None
-            output_model = parse_markdown_to_model(markdown, phase.output_model)
-
-        artifact = self._persist_phase_output(
-            run_dir=run_dir,
-            phase=phase,
-            output_model=output_model,
-        )
-        self._mark_phase_completed(
-            manifest=manifest,
-            phase=phase,
-            artifact=artifact,
-            input_artifact_ref=self._previous_phase_key(phase_key),
-            is_resume=True,
-        )
-        self._mark_downstream_stale(manifest=manifest, phase_key=phase_key)
+            md_path = run_dir / f"{phase_key}.md"
+            json_path = run_dir / f"{phase_key}.json"
+            if not json_path.exists():
+                raise ValueError(
+                    "Cannot update markdown only: no canonical JSON found. "
+                    "Provide json_content to update the artifact."
+                )
+            md_path.write_text(markdown, encoding="utf-8")
+            json_payload = json.loads(json_path.read_text(encoding="utf-8"))
+            artifact = self.get_artifact(run_id=run_id, phase_key=phase_key)
+            artifact = PipelineArtifact(
+                phase_key=artifact.phase_key,
+                title=artifact.title,
+                markdown=markdown,
+                saved_path=artifact.saved_path,
+                json_path=artifact.json_path,
+                xml_path=artifact.xml_path,
+                json_content=json_payload,
+                content_hash=artifact.content_hash,
+            )
 
         manifest["updated_at"] = datetime.now(UTC).isoformat()
         manifest["status"] = "partial" if self._next_incomplete_phase(manifest) else "completed"
@@ -390,9 +408,12 @@ class XToDemoPipelineService:
             archive.write(manifest_path, arcname="run-manifest.json")
             for phase in self._PHASES:
                 json_path = run_dir / f"{phase.key}.json"
+                xml_path = run_dir / f"{phase.key}.xml"
                 md_path = run_dir / f"{phase.key}.md"
                 if json_path.exists():
                     archive.write(json_path, arcname=json_path.name)
+                if xml_path.exists():
+                    archive.write(xml_path, arcname=xml_path.name)
                 if md_path.exists():
                     archive.write(md_path, arcname=md_path.name)
         return buffer.getvalue()

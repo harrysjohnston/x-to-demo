@@ -59,6 +59,7 @@ def _artifact_to_schema(artifact: PipelineArtifact) -> XToDemoArtifact:
         markdown=artifact.markdown,
         saved_path=artifact.saved_path,
         json_path=artifact.json_path,
+        xml_path=artifact.xml_path,
         json_content=artifact.json_content,
         content_hash=artifact.content_hash,
     )
@@ -166,6 +167,7 @@ def get_x_to_demo_run(
                 "status": phase.get("status"),
                 "input_artifact_ref": phase.get("input_artifact_ref"),
                 "output_json_path": phase.get("output_json_path"),
+                "output_xml_path": phase.get("output_xml_path"),
                 "output_md_path": phase.get("output_md_path"),
                 "content_hash": phase.get("content_hash"),
                 "error": phase.get("error"),

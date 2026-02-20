@@ -70,6 +70,7 @@ class PipelineManifestManager:
                     "status": "pending",
                     "input_artifact_ref": self.previous_phase_key(phase.key),
                     "output_json_path": None,
+                    "output_xml_path": None,
                     "output_md_path": None,
                     "content_hash": None,
                     "error": None,
@@ -133,6 +134,7 @@ class PipelineManifestManager:
         record["status"] = "completed"
         record["input_artifact_ref"] = input_artifact_ref
         record["output_json_path"] = artifact.json_path
+        record["output_xml_path"] = artifact.xml_path
         record["output_md_path"] = artifact.saved_path
         record["content_hash"] = artifact.content_hash
         record["error"] = None
@@ -175,6 +177,7 @@ class PipelineManifestManager:
             record = self.phase_record(manifest, phase.key)
             record["status"] = "pending"
             record["output_json_path"] = None
+            record["output_xml_path"] = None
             record["output_md_path"] = None
             record["content_hash"] = None
             record["error"] = None

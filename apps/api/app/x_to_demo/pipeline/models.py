@@ -78,6 +78,7 @@ class PipelineArtifact:
     markdown: str
     saved_path: str
     json_path: str
+    xml_path: str
     json_content: dict[str, Any]
     content_hash: str
 

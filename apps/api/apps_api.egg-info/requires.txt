@@ -14,6 +14,7 @@ openai>=1.109.0
 colorlog>=6.8
 pre-commit>=4.5.1
 ruff>=0.14.14
+xmltodict>=0.13
 
 [dev]
 pytest>=8.3

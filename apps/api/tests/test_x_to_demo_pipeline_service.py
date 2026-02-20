@@ -923,10 +923,13 @@ def test_run_writes_manifest_with_json_and_markdown_artifacts(tmp_path) -> None:
 
     run_dir = tmp_path / result.run_id
     assert (run_dir / "feature_spec.json").exists()
+    assert (run_dir / "feature_spec.xml").exists()
     assert (run_dir / "feature_spec.md").exists()
     assert (run_dir / "demo_spec.json").exists()
+    assert (run_dir / "demo_spec.xml").exists()
     assert (run_dir / "demo_spec.md").exists()
     assert (run_dir / "code_spec.json").exists()
+    assert (run_dir / "code_spec.xml").exists()
     assert (run_dir / "code_spec.md").exists()
 
     manifest = json.loads((run_dir / "run-manifest.json").read_text(encoding="utf-8"))

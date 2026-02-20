@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import re
 from typing import TYPE_CHECKING, Any
+
+import xmltodict
 
 from .schemas.code_spec import CodeSpecArtifact
 from .schemas.demo_spec import DemoSpecArtifact
@@ -13,7 +13,7 @@ from .schemas.feature_spec import FeatureSpecArtifact
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-_CANONICAL_JSON_HEADING = "## Canonical JSON"
+_CANONICAL_ROOT = "spec"
 
 
 def _bullet_lines(values: list[str], *, empty_message: str = "None") -> list[str]:
@@ -96,13 +96,54 @@ def _text_or_embedded_data_lines(value: Any) -> list[str]:
     ]
 
 
-def _canonical_json_block(model: BaseModel) -> list[str]:
-    return [
-        _CANONICAL_JSON_HEADING,
-        "```json",
-        json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True),
-        "```",
-    ]
+_XML_LIST_WRAPPER = "item"
+_XML_EMPTY_LIST_MARKER = "_empty"
+
+
+def _dict_to_xml_value(value: Any) -> Any:
+    """Transform dict for XML: wrap lists in {item: ...} so single elements parse as lists."""
+    if isinstance(value, dict):
+        return {k: _dict_to_xml_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        if not value:
+            return {_XML_EMPTY_LIST_MARKER: None}
+        return {_XML_LIST_WRAPPER: [_dict_to_xml_value(item) for item in value]}
+    return value
+
+
+def _xml_to_dict_value(value: Any) -> Any:
+    """Normalize parsed XML: unwrap {item: x} or {item: [a,b]} back to lists."""
+    if isinstance(value, dict):
+        if set(value.keys()) == {_XML_EMPTY_LIST_MARKER}:
+            return []
+        if set(value.keys()) == {_XML_LIST_WRAPPER}:
+            raw = value[_XML_LIST_WRAPPER]
+            if raw is None:
+                return []
+            if isinstance(raw, list):
+                return [_xml_to_dict_value(item) for item in raw]
+            return [_xml_to_dict_value(raw)]
+        return {k: _xml_to_dict_value(v) for k, v in value.items()}
+    if value is None:
+        return None
+    if isinstance(value, str) and value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    return value
+
+
+def _dict_to_xml(data: dict[str, Any]) -> str:
+    """Convert a dict to pretty-printed XML with a root wrapper."""
+    transformed = _dict_to_xml_value(data)
+    wrapped = {_CANONICAL_ROOT: transformed}
+    return xmltodict.unparse(wrapped, pretty=True)
+
+
+def _xml_to_dict(xml_str: str) -> dict[str, Any]:
+    """Parse XML to dict and unwrap the root element."""
+    parsed: dict[str, Any] = xmltodict.parse(xml_str)
+    if _CANONICAL_ROOT not in parsed:
+        raise ValueError(f"XML must have root element <{_CANONICAL_ROOT}>")
+    return _xml_to_dict_value(parsed[_CANONICAL_ROOT])
 
 
 def render_feature_spec_markdown(artifact: FeatureSpecArtifact) -> str:
@@ -194,7 +235,6 @@ def render_feature_spec_markdown(artifact: FeatureSpecArtifact) -> str:
             "## Spec Generation Metadata",
             *_spec_generation_metadata_lines(artifact.spec_generation_metadata),
             "",
-            *_canonical_json_block(artifact),
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -422,7 +462,6 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
             "## Spec Generation Metadata",
             *_spec_generation_metadata_lines(artifact.spec_generation_metadata),
             "",
-            *_canonical_json_block(artifact),
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -742,7 +781,6 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
             "## Spec Generation Metadata",
             *_spec_generation_metadata_lines(artifact.spec_generation_metadata),
             "",
-            *_canonical_json_block(artifact),
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -757,34 +795,3 @@ def render_markdown(model: BaseModel) -> str:
     if isinstance(model, CodeSpecArtifact):
         return render_code_spec_markdown(model)
     raise TypeError(f"Unsupported artifact model: {type(model).__name__}")
-
-
-def extract_canonical_json(markdown: str) -> dict[str, Any]:
-    """Extract canonical JSON payload embedded in markdown."""
-    canonical_section = re.search(
-        rf"{re.escape(_CANONICAL_JSON_HEADING)}\s*```json\s*(.*?)\s*```",
-        markdown,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    raw_block = canonical_section.group(1) if canonical_section else None
-
-    if raw_block is None:
-        blocks = re.findall(r"```json\s*(.*?)\s*```", markdown, flags=re.IGNORECASE | re.DOTALL)
-        if not blocks:
-            raise ValueError("No JSON code block found in markdown")
-        raw_block = blocks[-1]
-
-    try:
-        payload = json.loads(raw_block)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON block in markdown: {exc}") from exc
-
-    if not isinstance(payload, dict):
-        raise ValueError("Canonical JSON block must decode to an object")
-    return payload
-
-
-def parse_markdown_to_model(markdown: str, model_type: type[BaseModel]) -> BaseModel:
-    """Parse markdown to a model using the embedded canonical JSON block."""
-    payload = extract_canonical_json(markdown)
-    return model_type.model_validate(payload)

@@ -96,6 +96,7 @@ class XToDemoArtifact(BaseModel):
     markdown: str = Field(description="Phase markdown output")
     saved_path: str = Field(description="Relative path where phase output was saved")
     json_path: str = Field(description="Relative path where canonical phase JSON was saved")
+    xml_path: str = Field(description="Relative path where canonical phase XML was saved")
     json_content: dict[str, Any] = Field(description="Canonical JSON payload for this artifact")
     content_hash: str = Field(description="SHA256 hash of canonical artifact JSON")
 
@@ -150,6 +151,10 @@ class XToDemoPhaseStatus(BaseModel):
         default=None,
         description="Path to persisted canonical JSON output",
     )
+    output_xml_path: str | None = Field(
+        default=None,
+        description="Path to persisted canonical XML output",
+    )
     output_md_path: str | None = Field(
         default=None,
         description="Path to persisted markdown output",
@@ -196,7 +201,7 @@ class XToDemoUpdateArtifactRequest(BaseModel):
 
     markdown: str | None = Field(
         default=None,
-        description="Edited markdown containing canonical JSON block",
+        description="Edited human-readable markdown (canonical data in .json/.xml)",
     )
     json_content: dict[str, Any] | None = Field(
         default=None,

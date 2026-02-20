@@ -19,6 +19,7 @@ Requires-Dist: openai>=1.109.0
 Requires-Dist: colorlog>=6.8
 Requires-Dist: pre-commit>=4.5.1
 Requires-Dist: ruff>=0.14.14
+Requires-Dist: xmltodict>=0.13
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3; extra == "dev"
 Requires-Dist: pytest-cov>=6.0; extra == "dev"

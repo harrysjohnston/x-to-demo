@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from app.x_to_demo.renderers import render_markdown
+from app.x_to_demo.renderers import _dict_to_xml, render_markdown
 
 from .models import PIPELINE_PHASES, PhaseKey, PipelineArtifact, PipelinePhaseDefinition
 
@@ -30,12 +30,15 @@ class PipelineArtifactManager:
     ) -> PipelineArtifact:
         json_content = output_model.model_dump(mode="json")
         json_text = json.dumps(json_content, indent=2, sort_keys=True)
+        xml_text = _dict_to_xml(json_content)
         markdown = render_markdown(output_model)
         content_hash = hashlib.sha256(json_text.encode("utf-8")).hexdigest()
 
         json_path = run_dir / f"{phase.key}.json"
+        xml_path = run_dir / f"{phase.key}.xml"
         md_path = run_dir / f"{phase.key}.md"
         json_path.write_text(json_text + "\n", encoding="utf-8")
+        xml_path.write_text(xml_text + "\n", encoding="utf-8")
         md_path.write_text(markdown, encoding="utf-8")
 
         return PipelineArtifact(
@@ -44,6 +47,7 @@ class PipelineArtifactManager:
             markdown=markdown,
             saved_path=self.relative_or_absolute(md_path),
             json_path=self.relative_or_absolute(json_path),
+            xml_path=self.relative_or_absolute(xml_path),
             json_content=json_content,
             content_hash=content_hash,
         )
@@ -97,17 +101,20 @@ class PipelineArtifactManager:
                     json.dumps(json_payload, sort_keys=True).encode("utf-8")
                 ).hexdigest()
             )
+            json_path_resolved = (
+                Path(output_json_path)
+                if Path(output_json_path).is_absolute()
+                else run_dir / Path(output_json_path).name
+            )
+            xml_path_resolved = json_path_resolved.with_suffix(".xml")
             artifacts.append(
                 PipelineArtifact(
                     phase_key=phase.key,
                     title=phase.title,
                     markdown=markdown,
                     saved_path=self.relative_or_absolute(md_path),
-                    json_path=self.relative_or_absolute(
-                        Path(output_json_path)
-                        if Path(output_json_path).is_absolute()
-                        else run_dir / Path(output_json_path).name
-                    ),
+                    json_path=self.relative_or_absolute(json_path_resolved),
+                    xml_path=self.relative_or_absolute(xml_path_resolved),
                     json_content=json_payload,
                     content_hash=content_hash,
                 )

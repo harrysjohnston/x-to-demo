@@ -27,6 +27,7 @@ class FakePipelineService:
                 markdown="# Phase 1",
                 saved_path="artifacts/x-to-demo/run-1/feature_spec.md",
                 json_path="artifacts/x-to-demo/run-1/feature_spec.json",
+                xml_path="artifacts/x-to-demo/run-1/feature_spec.xml",
                 json_content={"feature_name": "Feature", "phase": 1},
                 content_hash="abc123",
             ),
@@ -36,6 +37,7 @@ class FakePipelineService:
                 markdown="# Final code spec",
                 saved_path="artifacts/x-to-demo/run-1/code_spec.md",
                 json_path="artifacts/x-to-demo/run-1/code_spec.json",
+                xml_path="artifacts/x-to-demo/run-1/code_spec.xml",
                 json_content={"feature_name": "Feature", "phase": 3},
                 content_hash="def456",
             ),
@@ -175,6 +177,7 @@ class FakePipelineService:
             markdown=artifact.markdown,
             saved_path=artifact.saved_path,
             json_path=artifact.json_path,
+            xml_path=artifact.xml_path,
             json_content=json_content or artifact.json_content,
             content_hash="updated-hash",
         )
