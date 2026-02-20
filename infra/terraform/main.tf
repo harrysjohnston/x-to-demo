@@ -153,9 +153,9 @@ module "ecs" {
   security_group_id  = module.networking.ecs_security_group_id
 
   # Task configuration
-  cpu           = local.config.ecs_cpu
-  memory        = local.config.ecs_memory
-  desired_count = local.ecs_desired_count
+  cpu                  = local.config.ecs_cpu
+  memory               = local.config.ecs_memory
+  desired_count        = local.ecs_desired_count
   ignore_desired_count = var.ecs_ignore_desired_count
 
   # Container images
@@ -167,7 +167,7 @@ module "ecs" {
   web_target_group_arn = module.loadbalancer.web_target_group_arn
 
   # Secrets
-  secrets_arns = module.secrets.all_secret_arns
+  secrets_arns         = module.secrets.all_secret_arns
   ghcr_credentials_arn = module.secrets.ghcr_credentials_arn
 
   # Environment variables

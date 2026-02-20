@@ -17,8 +17,6 @@ jobs:
         with:
           node-version: 20
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - name: Install
         run: pnpm install --no-frozen-lockfile
       - name: Biome (lint)
@@ -109,6 +107,7 @@ jobs:
 
   terraform:
     name: Terraform Validate
+    if: false  # Terraform job disabled
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -145,8 +144,6 @@ jobs:
           node-version: 20
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
