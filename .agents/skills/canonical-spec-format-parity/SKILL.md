@@ -26,6 +26,7 @@ JSON and XML derive from the same dict; markdown is hand-authored per field.
 ## Required Updates on Schema Change
 
 1. **Markdown** – Add or remove sections in the appropriate `render_*_spec_markdown()` so every schema field has a human-readable representation.
+   - Preset-specific reminder: when `synthetic_demo_inputs` preset fields change (`input_presets`, default preset id, apply/run semantics), update markdown preset sections in lockstep.
 2. **XML** – No explicit changes; `_dict_to_xml()` recurses over the dict. New fields appear automatically.
 3. **JSON** – No explicit changes; `model_dump(mode="json")` follows the schema.
 
