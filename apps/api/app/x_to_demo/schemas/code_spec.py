@@ -450,58 +450,6 @@ class ToolingPlan(StrictSchemaModel):
     )
 
 
-class RuntimeConfiguration(StrictSchemaModel):
-    """Runtime requirements for environment-based OpenAI key loading."""
-
-    env_var_name: Literal["OPENAI_API_KEY"] = Field(
-        description="Environment variable name required for OpenAI authentication."
-    )
-    env_file_name: str = Field(
-        description="Name or path convention for local-development environment file loading."
-    )
-    env_example_file: str = Field(
-        description="Committed example environment file path (for example .env.example)."
-    )
-    env_example_required: Literal[True] = Field(
-        description="Must be true: repository includes an environment example file."
-    )
-    load_strategy: str = Field(
-        description=(
-            "Concrete loading approach: read platform environment first, load local env file for "
-            "dev, and never hardcode or commit real secrets."
-        )
-    )
-    missing_key_fail_fast_behavior: str = Field(
-        description=(
-            "Fail-fast behavior when OPENAI_API_KEY is missing, including a clear UI-visible "
-            "error state and prevention of further AI calls."
-        )
-    )
-
-
-class ReadmeRequirements(StrictSchemaModel):
-    """README setup content required for local environment configuration and run flow."""
-
-    setup_steps: list[str] = Field(
-        min_length=1,
-        description=(
-            "Exact setup steps including creating/copying env file and setting OPENAI_API_KEY."
-        ),
-    )
-    env_file_instructions: str = Field(
-        description="Exact env-file placement, naming, and value-filling instructions."
-    )
-    local_run_instructions: str = Field(
-        description="Exact local run commands/steps matching the stack constraints."
-    )
-    troubleshooting: list[str] = Field(
-        min_length=1,
-        description=(
-            "Troubleshooting bullets including missing-key symptoms and environment loading fixes."
-        ),
-    )
-
-
 class CodeSpecArtifact(ArtifactBase):
     """Structured phase-3 artifact."""
 
@@ -511,12 +459,6 @@ class CodeSpecArtifact(ArtifactBase):
     tech_stack: TechStack = Field(description="Stack constraints and compatibility requirements.")
     openai_integration: OpenAIIntegration = Field(
         description="OpenAI API/model selection and response handling strategy."
-    )
-    runtime_configuration: RuntimeConfiguration = Field(
-        description="Required contract for environment-based OPENAI_API_KEY loading."
-    )
-    readme_requirements: ReadmeRequirements = Field(
-        description="Required README setup, local run, and troubleshooting instructions."
     )
     project_changes: list[str] = Field(
         default_factory=list,
