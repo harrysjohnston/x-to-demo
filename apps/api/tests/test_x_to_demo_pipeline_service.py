@@ -319,22 +319,35 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                     "Keep scope tight and highlight AI value.",
                 ],
             },
-            "default_first_run_inputs": {
-                "ordered_inputs": [
-                    "Need a concise feature intent from mixed notes.",
-                    "Show only one headline capability.",
-                ],
-                "trigger_action": "Auto-populate editor and invoke run on first launch.",
-            },
+            "input_presets": [
+                {
+                    "preset_id": "preset_intent_baseline",
+                    "label": "Intent baseline",
+                    "ordered_inputs": [
+                        "Need a concise feature intent from mixed notes.",
+                        "Show only one headline capability.",
+                    ],
+                    "where_used_in_headline_flows": [
+                        "intent_summarization",
+                        "step-generate",
+                    ],
+                    "expected_outputs": {
+                        "summary": "Expected sections rendered after explicit run.",
+                        "sample_records": [
+                            "Problem: ambiguous planning notes",
+                            "Objective: produce a concise structured intent",
+                        ],
+                    },
+                    "notes": "none",
+                }
+            ],
+            "default_selected_preset_id": "preset_intent_baseline",
+            "preset_application_behavior": (
+                "Applying a preset fills input fields only and does not execute a model call."
+            ),
+            "preset_execution_behavior": "Run executes only after explicit click on the Run demo control.",
             "why_this_data": "Covers the single headline summarization capability deterministically.",
             "safety_and_realism_notes": "Synthetic and non-PII, but representative of real planning notes.",
-            "expected_outputs": {
-                "summary": "Expected sections rendered by first-run output.",
-                "sample_records": [
-                    "Problem: ambiguous planning notes",
-                    "Objective: produce a concise structured intent",
-                ],
-            },
             "required_assets": [
                 {
                     "asset_id": "summary_seed_brief_txt",
@@ -350,6 +363,32 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                     "synthetic_label_text": "Synthetic demo text asset",
                 }
             ],
+        },
+        "runtime_input_and_guardrails": {
+            "accepts_runtime_inputs": True,
+            "supported_input_modalities": ["text"],
+            "input_capture_summary": (
+                "Input view captures runtime text via editor and preset controls."
+            ),
+            "guardrails_pipeline_summary": [
+                "Server validates input modality and size before model calls.",
+                "Server runs relevance model call with structured output.",
+                "Server runs safety model call with structured output.",
+            ],
+            "relevance_check_summary": (
+                "A structured-output relevance classifier returns is_relevant, reason, and user_message."
+            ),
+            "safety_check_summary": (
+                "A structured-output safety classifier returns is_safe, reason, and user_message."
+            ),
+            "user_visible_outcomes_on_reject": [
+                "Inline message in Input view explains why request was rejected.",
+                "Run action remains available after edits.",
+            ],
+            "cancel_flow_behavior": (
+                "Reject verdict halts flow before main AI call, keeps input state, and allows retry."
+            ),
+            "presets_go_through_same_guardrails": True,
         },
         "consistency_trace": {
             "phase1_headline_capability_refs": ["intent_summarization"],
@@ -436,8 +475,8 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                     "what_would_break_if_swapped": "Replacing with realtime or agents adds unnecessary complexity.",
                 }
             ],
-            "covers_requires_voice": True,
-            "covers_requires_tool_loop": True,
+            "covers_requires_voice": False,
+            "covers_requires_tool_loop": False,
             "models": {
                 "primary": "gpt-5.2",
                 "fallbacks": ["gpt-5.1", "gpt-5-mini"],
@@ -464,6 +503,12 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 ),
             },
         },
+        "agent_skills_to_apply": [
+            "runtime-input-guardrails-server-side",
+            "synthetic-input-presets",
+            "canonical-spec-format-parity",
+            "generated-output-badge",
+        ],
         "project_changes": ["apps/web/components/XToDemoStudio.tsx"],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
         "state_model": {"fields": ["xInput", "phaseStatus", "artifacts"]},
@@ -480,6 +525,33 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "input_filters": ["reject_empty_input"],
                 "refusal_policy": "Refuse unsafe or off-topic requests.",
                 "short_circuit_behavior": "Return concise refusal object on disallowed input.",
+                "runtime_guardrails_plan": {
+                    "server_side_only": True,
+                    "deterministic_type_checks": [
+                        "Validate runtime input is text and below max size before model calls.",
+                        "Return unsupported verdict for unsupported modalities.",
+                    ],
+                    "relevance_model_call": "responses:gpt-5.2 for relevance verdict",
+                    "relevance_prompt_contract": (
+                        "Pass supported modalities and demo scope context; return JSON RelevanceVerdict only."
+                    ),
+                    "relevance_output_schema": (
+                        "RelevanceVerdict { is_relevant: bool, reason: str, user_message: str }"
+                    ),
+                    "safety_model_call": "responses:gpt-5.2 for safety verdict",
+                    "safety_prompt_contract": (
+                        "Pass normalized runtime input; return JSON SafetyVerdict only."
+                    ),
+                    "safety_output_schema": (
+                        "SafetyVerdict { is_safe: bool, reason: str, user_message: str }"
+                    ),
+                    "verdict_handling": (
+                        "unsupported -> show unsupported message and stop; block -> show safety refusal and stop; allow -> proceed."
+                    ),
+                    "logging_policy": (
+                        "Persist request ids, verdicts, timings, and parse outcome only; never raw runtime content."
+                    ),
+                },
             },
             "mock_strategy": "Deterministic fixtures",
         },
@@ -496,7 +568,10 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
         "synthetic_data_implementation": {
             "data_location": "Local fixture module under app data folder.",
             "load_on_startup": "Load seed dataset at app init before first render.",
-            "auto_populate_first_run": "Prefill input and trigger run once on initial launch.",
+            "auto_apply_default_preset_on_load": (
+                "Select default preset and populate input fields only on initial load."
+            ),
+            "auto_populate_first_run": None,
             "reset_and_rerun_control": "Reset button restores seed input and reruns flow.",
             "determinism_guidance": "Use fixed fixtures and deterministic response snapshots.",
         },
@@ -583,6 +658,10 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "Add deterministic tests that assert required assets exist at assets/synthetic/, "
                 "have expected extension + non-zero size within limits, and verify startup seeded "
                 "flows run with network calls to asset generation disabled."
+            ),
+            "preset_inputs_integration_coverage": (
+                "Integration tests iterate every preset, apply it, execute runtime guardrails, "
+                "and assert each preset reaches mocked main flow execution."
             ),
             "openai_test_tiers": {
                 "mocked": {
@@ -836,6 +915,40 @@ def test_openai_compatible_schema_handles_deep_nesting_and_ref_arrays() -> None:
     assert set(normalized["$defs"]["Leaf"]["required"]) == {"name", "meta"}
     assert normalized["$defs"]["Leaf"]["properties"]["meta"]["additionalProperties"] is False
     assert set(normalized["$defs"]["Leaf"]["properties"]["meta"]["required"]) == {"score"}
+
+
+def test_demo_spec_markdown_includes_presets_and_avoids_auto_run_language() -> None:
+    artifact = DemoSpecArtifact.model_validate(_demo_spec_payload())
+
+    markdown = render_demo_spec_markdown(artifact)
+
+    assert "### Input Presets" in markdown
+    assert "Default selected preset ID" in markdown
+    assert "Preset application behavior" in markdown
+    assert "Preset execution behavior" in markdown
+    assert "Runtime Inputs And Guardrails" in markdown
+    assert "Default First Run Inputs" not in markdown
+    assert "trigger run once on initial launch" not in markdown.lower()
+
+
+def test_code_spec_markdown_includes_runtime_guardrails_two_model_calls() -> None:
+    artifact = CodeSpecArtifact.model_validate(_code_spec_payload())
+
+    markdown = render_code_spec_markdown(artifact)
+
+    assert "#### Runtime Guardrails Plan" in markdown
+    assert "- Relevance model call:" in markdown
+    assert "- Safety model call:" in markdown
+    assert "Server-side only: Yes" in markdown
+
+
+def test_code_spec_testing_strategy_includes_preset_integration_coverage() -> None:
+    artifact = CodeSpecArtifact.model_validate(_code_spec_payload())
+
+    assert (
+        "iterate every preset"
+        in artifact.testing_strategy.preset_inputs_integration_coverage.lower()
+    )
 
 
 def test_wait_logging_reports_progress_at_intervals(monkeypatch, caplog, tmp_path) -> None:
@@ -1108,15 +1221,14 @@ def test_render_demo_spec_markdown_replaces_default_first_run_with_presets() -> 
 
     assert "### Input Presets" in markdown
     assert "### Default First Run Inputs" not in markdown
-    assert "- Default selected preset id:" in markdown
+    assert "- Default selected preset ID:" in markdown
     assert "- Preset application behavior:" in markdown
     assert "- Preset execution behavior:" in markdown
-    assert "## Runtime Input + Guardrails" in markdown
+    assert "## Runtime Inputs And Guardrails" in markdown
 
 
 def test_render_demo_spec_markdown_renders_runtime_guardrails_when_present() -> None:
-    artifact = DemoSpecArtifact.model_validate(_demo_spec_payload())
-    payload = artifact.model_dump(mode="json")
+    payload = _demo_spec_payload()
     payload["synthetic_demo_inputs"] = {
         **payload["synthetic_demo_inputs"],
         "input_presets": [
@@ -1160,14 +1272,14 @@ def test_render_demo_spec_markdown_renders_runtime_guardrails_when_present() -> 
         "cancel_flow_behavior": "Reject verdict cancels main call and preserves editable input state.",
         "presets_go_through_same_guardrails": True,
     }
-    proxied_artifact = _ArtifactModelDumpProxy(artifact, payload)
+    artifact = DemoSpecArtifact.model_validate(payload)
 
-    markdown = render_demo_spec_markdown(proxied_artifact)
+    markdown = render_demo_spec_markdown(artifact)
 
     assert "preset-support-ticket" in markdown
     assert "Preset apply fills controls only; no run starts." in markdown
     assert "Run executes guardrails and main flow explicitly." in markdown
-    assert "## Runtime Input + Guardrails" in markdown
+    assert "## Runtime Inputs And Guardrails" in markdown
     assert "- Supported input modalities:" in markdown
     assert "Server calls relevance classifier with structured JSON verdict." in markdown
     assert "Reject verdict cancels main call and preserves editable input state." in markdown
@@ -1185,8 +1297,7 @@ def test_render_code_spec_markdown_includes_runtime_guardrails_and_skill_section
 
 
 def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present() -> None:
-    artifact = CodeSpecArtifact.model_validate(_code_spec_payload())
-    payload = artifact.model_dump(mode="json")
+    payload = _code_spec_payload()
     payload["ai_seam"]["guardrails"]["runtime_guardrails_plan"] = {
         "server_side_only": True,
         "deterministic_type_checks": [
@@ -1210,9 +1321,9 @@ def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present(
         "synthetic-input-presets",
         "canonical-spec-format-parity",
     ]
-    proxied_artifact = _ArtifactModelDumpProxy(artifact, payload)
+    artifact = CodeSpecArtifact.model_validate(payload)
 
-    markdown = render_code_spec_markdown(proxied_artifact)
+    markdown = render_code_spec_markdown(artifact)
 
     assert "- Server-side only: Yes" in markdown
     assert "- Deterministic type checks:" in markdown
