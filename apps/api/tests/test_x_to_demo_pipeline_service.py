@@ -415,6 +415,22 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "parsing_and_validation": "Validate response payloads against phase schemas.",
                 "post_processing": "Normalize field ordering before UI rendering.",
             },
+            "request_validation": {
+                "preflight_checks": [
+                    "Validate selected model is allowed and configured.",
+                    "Validate all required request fields are present before send.",
+                    "Validate strict structured-output schema compatibility before send.",
+                ],
+                "fail_fast_behavior": (
+                    "If validation fails, no request is sent and a clear error message is surfaced in the UI."
+                ),
+                "ui_error_state_contract": (
+                    "Show a blocking inline error banner in the run panel with fix guidance and retry action."
+                ),
+                "debug_logging_policy": (
+                    "Log request id, model, timing, status, and schema parse outcome only; never persist raw prompts, raw responses, or API keys."
+                ),
+            },
         },
         "project_changes": ["apps/web/components/XToDemoStudio.tsx"],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
@@ -496,6 +512,42 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "mocking_instructions": (
                 "Mock OpenAI calls with deterministic fixtures; keep snapshots stable for key rendered sections."
             ),
+            "openai_test_tiers": {
+                "mocked": {
+                    "always_run_by_default": True,
+                    "coverage_requirements": [
+                        "Request payload formation for each headline item.",
+                        "Structured-output schema parsing and validation behavior.",
+                        "Guardrail short-circuit behavior for disallowed inputs.",
+                        "Tool-call display behavior where tools are enabled.",
+                    ],
+                    "mocking_strategy": (
+                        "Use deterministic fixtures and stable snapshots for OpenAI responses."
+                    ),
+                },
+                "live_smoke": {
+                    "opt_in": True,
+                    "run_condition": (
+                        "Run only when OPENAI_API_KEY is set and RUN_LIVE_OPENAI_TESTS=1."
+                    ),
+                    "skip_behavior": (
+                        "When opt-in conditions are unmet, report tests as skipped without failing the default suite."
+                    ),
+                    "cost_and_safety_constraints": [
+                        "Use only low-token prompts against default demo models.",
+                        "Execute minimal calls for one headline flow only.",
+                        "Prefer deterministic assertions on status, parse result, and key UI/state updates.",
+                    ],
+                    "what_it_verifies": [
+                        "A real OpenAI request succeeds under opted-in configuration.",
+                        "The response parses successfully against the expected schema.",
+                        "At least one headline flow updates UI/state as expected.",
+                    ],
+                    "commands_or_how_to_run": [
+                        "OPENAI_API_KEY=... RUN_LIVE_OPENAI_TESTS=1 uv run pytest -q -c apps/api/pyproject.toml apps/api/tests -k live_openai_smoke"
+                    ],
+                },
+            },
             "verification_steps": [
                 "Run unit test command for changed modules.",
                 "Confirm all tests pass with no flaky reruns.",

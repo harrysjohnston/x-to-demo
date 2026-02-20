@@ -138,6 +138,8 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - Output is designed for demo-build handoff, not production architecture.
 - Phase-2 `DemoSpec` artifacts now require `interaction_contracts` that enumerate every per-screen interactive control with behavior, observable effects, enable/disable rules, and loading-state expectations.
 - Phase-3 `CodeSpec` artifacts now require `testing_strategy.interaction_test_matrix` that maps each control id to enabled/disabled/loading assertions under the no-inert-controls rule.
+- Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
+- Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
 - Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
 
 ## Related Docs
@@ -148,4 +150,4 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - Deployment: `/docs/deployment.md`
 - Architecture notes: `/architecture_decisions.md`
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-20

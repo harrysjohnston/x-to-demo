@@ -81,6 +81,38 @@ class OpenAIResponseHandling(StrictSchemaModel):
     )
 
 
+class OpenAIRequestValidation(StrictSchemaModel):
+    """Preflight validation and fail-fast error behavior for OpenAI requests."""
+
+    preflight_checks: list[str] = Field(
+        min_length=1,
+        description=(
+            "Concrete checks run before sending any OpenAI request, including model name "
+            "validation, required field presence, and structured-output schema constraint "
+            "validation for strict compatibility."
+        ),
+    )
+    fail_fast_behavior: str = Field(
+        description=(
+            "Fail-fast behavior when validation fails. Must state that no request is sent and "
+            "that a clear error message is surfaced in the UI."
+        )
+    )
+    ui_error_state_contract: str = Field(
+        description=(
+            "UI-visible error contract describing where validation failures are shown and how "
+            "users recover (for example retry/reset/fix configuration)."
+        )
+    )
+    debug_logging_policy: str = Field(
+        description=(
+            "Debug metadata logging policy (request id, model, timings, status, schema parse "
+            "outcome) that explicitly forbids persisting sensitive content such as raw prompts, "
+            "raw responses, or API keys."
+        )
+    )
+
+
 class OpenAIDecisionRationale(StrictSchemaModel):
     """Selection rationale dimensions used for API choice."""
 
@@ -143,6 +175,9 @@ class OpenAIIntegration(StrictSchemaModel):
     models: OpenAIModelSelection = Field(description="Primary/fallback model strategy.")
     response_handling: OpenAIResponseHandling = Field(
         description="Structured output parsing and post-processing plan."
+    )
+    request_validation: OpenAIRequestValidation = Field(
+        description="Required preflight validation and fail-fast UI error behavior."
     )
 
 
@@ -276,6 +311,71 @@ class InteractionTestMatrix(StrictSchemaModel):
     )
 
 
+class MockedTestTier(StrictSchemaModel):
+    """Mocked OpenAI tests that run by default in local and CI flows."""
+
+    always_run_by_default: Literal[True] = Field(
+        description="Must be true: mocked tests run by default in CI/local."
+    )
+    coverage_requirements: list[str] = Field(
+        min_length=1,
+        description=(
+            "Mocked-test coverage requirements, including request payload formation, schema "
+            "parsing/validation, guardrail short-circuit behavior, and tool-call display "
+            "behavior when tools are present."
+        ),
+    )
+    mocking_strategy: str = Field(
+        description=(
+            "Deterministic OpenAI mocking strategy (fixtures/snapshots) aligned to the test plan."
+        )
+    )
+
+
+class LiveSmokeTestTier(StrictSchemaModel):
+    """Opt-in live smoke tests that validate real OpenAI connectivity safely."""
+
+    opt_in: Literal[True] = Field(description="Must be true: live smoke tests are opt-in only.")
+    run_condition: str = Field(
+        description=(
+            "Exact run condition for live smoke tests, explicitly gated by OPENAI_API_KEY and "
+            "optionally a dedicated opt-in flag such as RUN_LIVE_OPENAI_TESTS=1."
+        )
+    )
+    skip_behavior: str = Field(
+        description=(
+            "Skip behavior contract: tests are safe to skip when not opted in and report as "
+            "skipped (not failed) in the default suite."
+        )
+    )
+    cost_and_safety_constraints: list[str] = Field(
+        min_length=1,
+        description=(
+            "Low-cost safety constraints for live tests (minimal calls, default models, low "
+            "token usage, deterministic assertions where feasible)."
+        ),
+    )
+    what_it_verifies: list[str] = Field(
+        min_length=1,
+        description=(
+            "Capabilities verified by live smoke tests, including request success, response parse "
+            "success, and expected UI/state update for at least one headline flow."
+        ),
+    )
+    commands_or_how_to_run: list[str] = Field(
+        min_length=1, description="Concrete commands or steps for running live smoke tests locally."
+    )
+
+
+class OpenAITestTiers(StrictSchemaModel):
+    """Required two-tier OpenAI testing strategy."""
+
+    mocked: MockedTestTier = Field(description="Mocked unit/integration tests (default tier).")
+    live_smoke: LiveSmokeTestTier = Field(
+        description="Opt-in live integration smoke tests (gated tier)."
+    )
+
+
 class TestingStrategy(StrictSchemaModel):
     """Testing requirements for deterministic demo delivery."""
 
@@ -324,6 +424,12 @@ class TestingStrategy(StrictSchemaModel):
         description=(
             "How to mock OpenAI calls and optional tools using deterministic synthetic fixtures "
             "and snapshot-style expectations where useful."
+        )
+    )
+    openai_test_tiers: OpenAITestTiers = Field(
+        description=(
+            "Required two-tier OpenAI tests: mocked tests run by default and live smoke tests "
+            "run only when explicitly opted in (for example OPENAI_API_KEY plus flag)."
         )
     )
     verification_steps: list[str] = Field(

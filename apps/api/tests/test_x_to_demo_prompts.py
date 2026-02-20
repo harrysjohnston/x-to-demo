@@ -102,6 +102,11 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "TestingStrategy must include interaction_test_matrix where each DemoSpec control_id"
         in developer_prompt
     )
+    assert "Validate every OpenAI request before sending" in developer_prompt
+    assert "fail fast with a clear UI-visible error message" in developer_prompt
+    assert "CodeSpec must include two-tier OpenAI tests" in developer_prompt
+    assert "OpenAIIntegration must include request_validation" in developer_prompt
+    assert "TestingStrategy must include openai_test_tiers" in developer_prompt
     assert "Choose OpenAI API(s) and initial prompts aligned to headline items." in user_prompt
     assert "If any headline item is voice, include Realtime." in user_prompt
     assert (
@@ -132,6 +137,8 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Include TestingStrategy.interaction_test_matrix mapping every control_id_ref"
         in user_prompt
     )
+    assert "Include OpenAIIntegration.request_validation" in user_prompt
+    assert "Include TestingStrategy.openai_test_tiers" in user_prompt
     assert "Set interaction_test_matrix.rule to include" in user_prompt
     assert (
         "Do not use vague test language; provide concrete targets, mocks, and verification steps."
@@ -151,6 +158,7 @@ def test_code_spec_schema_requires_explicit_testing_strategy_fields() -> None:
     assert "test_targets" in required
     assert "acceptance_tests_scope_rules" in required
     assert "mocking_instructions" in required
+    assert "openai_test_tiers" in required
     assert "verification_steps" in required
     assert "walkthrough_test_suite_requirements" in required
     assert "interaction_test_matrix" in required
@@ -171,6 +179,23 @@ def test_code_spec_schema_requires_walkthrough_state_machine_model() -> None:
 
 def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> None:
     normalized = openai_compatible_schema(CodeSpecArtifact.model_json_schema())
+    openai_name = normalized["properties"]["openai_integration"]["$ref"].split("/")[-1]
+    openai_schema = normalized["$defs"][openai_name]
+    assert openai_schema["additionalProperties"] is False
+    assert "request_validation" in set(openai_schema["required"])
+
+    request_validation_name = openai_schema["properties"]["request_validation"]["$ref"].split("/")[
+        -1
+    ]
+    request_validation_schema = normalized["$defs"][request_validation_name]
+    assert request_validation_schema["additionalProperties"] is False
+    assert set(request_validation_schema["required"]) == {
+        "debug_logging_policy",
+        "fail_fast_behavior",
+        "preflight_checks",
+        "ui_error_state_contract",
+    }
+
     walkthrough_name = normalized["properties"]["walkthrough_implementation"]["$ref"].split("/")[-1]
     walkthrough_schema = normalized["$defs"][walkthrough_name]
 
@@ -185,8 +210,37 @@ def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> Non
     testing_name = normalized["properties"]["testing_strategy"]["$ref"].split("/")[-1]
     testing_schema = normalized["$defs"][testing_name]
     assert testing_schema["additionalProperties"] is False
+    assert "openai_test_tiers" in set(testing_schema["required"])
     assert "walkthrough_test_suite_requirements" in set(testing_schema["required"])
     assert "interaction_test_matrix" in set(testing_schema["required"])
+
+    openai_tiers_name = testing_schema["properties"]["openai_test_tiers"]["$ref"].split("/")[-1]
+    openai_tiers_schema = normalized["$defs"][openai_tiers_name]
+    assert openai_tiers_schema["additionalProperties"] is False
+    assert set(openai_tiers_schema["required"]) == {"live_smoke", "mocked"}
+
+    mocked_tier_name = openai_tiers_schema["properties"]["mocked"]["$ref"].split("/")[-1]
+    mocked_tier_schema = normalized["$defs"][mocked_tier_name]
+    assert mocked_tier_schema["additionalProperties"] is False
+    assert set(mocked_tier_schema["required"]) == {
+        "always_run_by_default",
+        "coverage_requirements",
+        "mocking_strategy",
+    }
+    assert mocked_tier_schema["properties"]["always_run_by_default"]["const"] is True
+
+    live_tier_name = openai_tiers_schema["properties"]["live_smoke"]["$ref"].split("/")[-1]
+    live_tier_schema = normalized["$defs"][live_tier_name]
+    assert live_tier_schema["additionalProperties"] is False
+    assert set(live_tier_schema["required"]) == {
+        "commands_or_how_to_run",
+        "cost_and_safety_constraints",
+        "opt_in",
+        "run_condition",
+        "skip_behavior",
+        "what_it_verifies",
+    }
+    assert live_tier_schema["properties"]["opt_in"]["const"] is True
 
     matrix_name = testing_schema["properties"]["interaction_test_matrix"]["$ref"].split("/")[-1]
     matrix_schema = normalized["$defs"][matrix_name]
@@ -250,6 +304,7 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "api_usage_by_headline_item" in openai_required
     assert "covers_requires_voice" in openai_required
     assert "covers_requires_tool_loop" in openai_required
+    assert "request_validation" in openai_required
 
 
 def test_all_artifact_schemas_separate_spec_generation_metadata() -> None:

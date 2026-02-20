@@ -1,0 +1,230 @@
+<coding_agent_prompt id="g7-live-openai-tests-and-request-validation-xml">
+  <meta>
+    <task_id>G7</task_id>
+    <task_name>Live OpenAI integration smoke tests (opt-in) + request validation (fail-fast, UI surfaced)</task_name>
+  </meta>
+
+  <repo_inspection>
+    <observed_files>
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py">
+        <notes>
+          <note>OpenAIIntegration currently defines selected_apis, models, and response_handling, but does not include a required request_validation contract.</note>
+          <note>TestingStrategy is strong, but does not explicitly require two-tier tests: mocked-by-default + opt-in live smoke tests when OPENAI_API_KEY is set.</note>
+        </notes>
+      </file>
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py">
+        <notes>
+          <note>Phase-3 prompt rules require tests and mocking, but do not hard-require live smoke tests or request validation before sending requests.</note>
+        </notes>
+      </file>
+    </observed_files>
+  </repo_inspection>
+
+  <objective>
+    <summary>
+      Modify phase-3 CodeSpec schema + phase-3 prompting so every generated CodeSpec:
+      (1) mandates request validation before sending any OpenAI request (model name, required fields, structured-output schema constraints),
+      (2) fails fast with a clear UI-visible error state (no silent failures),
+      (3) requires two tiers of tests:
+          - mocked unit/integration tests that always run by default (CI/local),
+          - opt-in live integration smoke tests that run only when OPENAI_API_KEY is set (or explicit flag), are low-cost, and are safe to skip without failing the default test suite.
+    </summary>
+  </objective>
+
+  <implementation_plan>
+    <step index="1" title="Schema: add OpenAI request validation requirements (required)">
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py" />
+      <changes>
+        <add_models>
+          <model name="OpenAIRequestValidation" base="StrictSchemaModel">
+            <field name="preflight_checks" type="list[str]" required="true">
+              <description>
+                Concrete validation checks performed before any OpenAI request is sent.
+                Must include: model name validation; required field presence; structured-output schema constraints validation (e.g., schema is strict-compatible).
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="fail_fast_behavior" type="str" required="true">
+              <description>
+                Fail-fast behavior when validation fails: what exception/error path is triggered and what the UI shows.
+                Must explicitly state “clear error message surfaced in the UI” and that no request is sent on validation failure.
+              </description>
+            </field>
+            <field name="ui_error_state_contract" type="str" required="true">
+              <description>
+                UI-visible error state contract: where the error appears (banner/toast/panel), and how users recover
+                (e.g., fix key, retry button, reset flow).
+              </description>
+            </field>
+            <field name="debug_logging_policy" type="str" required="true">
+              <description>
+                What metadata is logged for demo debugging (request id, model, timing, status, schema parse outcome),
+                explicitly stating: do not persist sensitive content (no raw prompts/responses or keys).
+              </description>
+            </field>
+          </model>
+        </add_models>
+
+        <modify_existing_model name="OpenAIIntegration">
+          <add_required_field name="request_validation" type="OpenAIRequestValidation">
+            <description>Required preflight request validation and fail-fast UI error behavior.</description>
+          </add_required_field>
+          <notes>
+            <note>Keep schema strictness (extra=&quot;forbid&quot;). Do not add optional-only validation; this must be required and explicit.</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>OpenAIIntegration includes required request_validation with explicit preflight checks and UI surfaced fail-fast behavior.</criterion>
+        <criterion>debug_logging_policy explicitly forbids persisting sensitive content.</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="2" title="Schema: require two-tier tests (mocked default + opt-in live smoke tests)">
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py" />
+      <changes>
+        <add_models>
+          <model name="MockedTestTier" base="StrictSchemaModel">
+            <field name="always_run_by_default" type="bool" required="true">
+              <description>Must be true: mocked tests run in CI/local by default.</description>
+              <constraint>Literal[True]</constraint>
+            </field>
+            <field name="coverage_requirements" type="list[str]" required="true">
+              <description>
+                What mocked tests must verify. Must include:
+                request payload formation; schema parsing/validation; guardrails short-circuit behavior; tool-call display behavior (if any).
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="mocking_strategy" type="str" required="true">
+              <description>Deterministic mocking strategy for OpenAI calls (fixtures/snapshots), aligned with existing mocking guidance.</description>
+            </field>
+          </model>
+
+          <model name="LiveSmokeTestTier" base="StrictSchemaModel">
+            <field name="opt_in" type="bool" required="true">
+              <description>Must be true: live tests are opt-in only.</description>
+              <constraint>Literal[True]</constraint>
+            </field>
+            <field name="run_condition" type="str" required="true">
+              <description>
+                Exact condition under which live tests run. Must mention:
+                OPENAI_API_KEY is set (and optionally an explicit flag like RUN_LIVE_OPENAI_TESTS=1).
+              </description>
+            </field>
+            <field name="skip_behavior" type="str" required="true">
+              <description>
+                Must clearly state: safe to skip without failing default test suite; skipped tests should report as skipped, not failed.
+              </description>
+            </field>
+            <field name="cost_and_safety_constraints" type="list[str]" required="true">
+              <description>
+                Low-cost, minimal calls only using the demo’s default models; avoid high token usage; keep deterministic assertions where possible.
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="what_it_verifies" type="list[str]" required="true">
+              <description>
+                Must include: request succeeds; response parses successfully; UI/state updates as expected for at least one headline flow.
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="commands_or_how_to_run" type="list[str]" required="true">
+              <description>Concrete commands/steps to run the live smoke tests locally.</description>
+              <constraint>min_length=1</constraint>
+            </field>
+          </model>
+
+          <model name="OpenAITestTiers" base="StrictSchemaModel">
+            <field name="mocked" type="MockedTestTier" required="true">
+              <description>Mocked unit/integration tests (default).</description>
+            </field>
+            <field name="live_smoke" type="LiveSmokeTestTier" required="true">
+              <description>Opt-in live integration smoke tests (only with key/flag).</description>
+            </field>
+          </model>
+        </add_models>
+
+        <modify_existing_model name="TestingStrategy">
+          <add_required_field name="openai_test_tiers" type="OpenAITestTiers">
+            <description>
+              Required two-tier test plan for OpenAI integration: mocked-by-default + opt-in live smoke tests when OPENAI_API_KEY is present.
+            </description>
+          </add_required_field>
+          <notes>
+            <note>Keep existing verification_steps list; ensure it includes commands for both tiers and clearly labels live as optional.</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>TestingStrategy includes required openai_test_tiers with mocked.always_run_by_default=true and live_smoke.opt_in=true.</criterion>
+        <criterion>Live smoke tests explicitly define run_condition, skip behavior (skipped not failing), low-cost constraints, and what is verified.</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="3" title="Prompts: enforce request validation + two-tier testing in phase-3 output">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <update_global_hard_rules>
+          <add_rule>
+            OpenAI requests must be validated before sending (model, required fields, schema constraints) and must fail fast with a clear UI-visible error message—no silent failures.
+          </add_rule>
+          <add_rule>
+            CodeSpec must include two-tier OpenAI tests: mocked-by-default plus opt-in live smoke tests that only run when OPENAI_API_KEY is set and are safe to skip without failing the default suite.
+          </add_rule>
+        </update_global_hard_rules>
+
+        <update_phase_rules phase="code_spec">
+          <add_rule>
+            OpenAIIntegration must include request_validation with concrete preflight checks, UI error state contract, and a debug logging policy that avoids persisting sensitive content.
+          </add_rule>
+          <add_rule>
+            TestingStrategy must include openai_test_tiers:
+            mocked tests validate request formation + parsing + guardrails short-circuit + tool-call display (if any),
+            and live smoke tests (opt-in) prove real connectivity, parse success, and UI/state updates using default models.
+          </add_rule>
+        </update_phase_rules>
+
+        <update_phase_priority_checklist phase="code_spec">
+          <add_item>Include OpenAIIntegration.request_validation (preflight checks + fail-fast UI errors + safe debug logging).</add_item>
+          <add_item>Include TestingStrategy.openai_test_tiers (mocked default + opt-in live smoke tests when OPENAI_API_KEY is set; skipped safely otherwise).</add_item>
+        </update_phase_priority_checklist>
+
+        <notes>
+          <note>Preserve JSON-only output and strict schema adherence.</note>
+          <note>Do not require live tests in default CI; they must be optional and explicitly gated by env/flag.</note>
+        </notes>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>Phase-3 generated CodeSpec reliably includes request_validation and openai_test_tiers (not vague, not optional).</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="4" title="Structured-output strictness sanity check">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <verify>
+          <item>
+            After adding nested models to CodeSpec, confirm openai_compatible_schema() still produces strict-compatible schemas
+            (additionalProperties:false, required includes all properties, and $ref-only nodes).
+          </item>
+        </verify>
+      </changes>
+      <acceptance_criteria>
+        <criterion>No regressions in strict structured output compatibility.</criterion>
+      </acceptance_criteria>
+    </step>
+  </implementation_plan>
+
+  <definition_of_done>
+    <checks>
+      <check>Every generated CodeSpec includes OpenAIIntegration.request_validation with explicit preflight checks and UI-visible fail-fast behavior.</check>
+      <check>Every generated CodeSpec includes TestingStrategy.openai_test_tiers with mocked-by-default and opt-in live smoke tests gated by OPENAI_API_KEY (and/or explicit flag) and safely skippable.</check>
+      <check>Live smoke tests are minimal/low-cost, verify success + parsing + UI/state update, and provide concrete run commands.</check>
+      <check>Prompt rules/checklist force these requirements so downstream coding agents implement them consistently.</check>
+    </checks>
+  </definition_of_done>
+</coding_agent_prompt>
