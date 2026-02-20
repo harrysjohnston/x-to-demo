@@ -10,6 +10,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.x_to_demo_pipeline import XToDemoPipelineService
+from app.x_to_demo.renderers import render_code_spec_markdown, render_demo_spec_markdown
+from app.x_to_demo.schemas.code_spec import CodeSpecArtifact
+from app.x_to_demo.schemas.demo_spec import DemoSpecArtifact
 
 
 class _FakeResponse:
@@ -40,6 +43,20 @@ class _FakeResponsesAPI:
 class _FakeClient:
     def __init__(self, responses: list[_FakeResponse]) -> None:
         self.responses = _FakeResponsesAPI(responses)
+
+
+class _ArtifactModelDumpProxy:
+    """Proxy that preserves model attributes while overriding model_dump payload."""
+
+    def __init__(self, artifact, payload: dict[str, object]) -> None:
+        self._artifact = artifact
+        self._payload = payload
+
+    def model_dump(self, *_args, **_kwargs) -> dict[str, object]:
+        return self._payload
+
+    def __getattr__(self, name: str):
+        return getattr(self._artifact, name)
 
 
 def _build_service(*, output_dir, responses: list[_FakeResponse]) -> XToDemoPipelineService:
@@ -1082,3 +1099,125 @@ def test_run_rejects_invalid_reasoning_for_selected_model(tmp_path) -> None:
             model="gpt-5.2",
             reasoning_effort="minimal",
         )
+
+
+def test_render_demo_spec_markdown_replaces_default_first_run_with_presets() -> None:
+    artifact = DemoSpecArtifact.model_validate(_demo_spec_payload())
+
+    markdown = render_demo_spec_markdown(artifact)
+
+    assert "### Input Presets" in markdown
+    assert "### Default First Run Inputs" not in markdown
+    assert "- Default selected preset id:" in markdown
+    assert "- Preset application behavior:" in markdown
+    assert "- Preset execution behavior:" in markdown
+    assert "## Runtime Input + Guardrails" in markdown
+
+
+def test_render_demo_spec_markdown_renders_runtime_guardrails_when_present() -> None:
+    artifact = DemoSpecArtifact.model_validate(_demo_spec_payload())
+    payload = artifact.model_dump(mode="json")
+    payload["synthetic_demo_inputs"] = {
+        **payload["synthetic_demo_inputs"],
+        "input_presets": [
+            {
+                "preset_id": "preset-support-ticket",
+                "label": "Support ticket triage",
+                "ordered_inputs": [
+                    "Summarize this synthetic ticket backlog.",
+                    "Prioritize the top two urgent issues.",
+                ],
+                "where_used_in_headline_flows": ["intent_summarization", "step-generate"],
+                "expected_outputs": {
+                    "summary": "Expected deterministic triage output.",
+                    "sample_records": [
+                        "Issue categories appear in priority order.",
+                        "Top two tickets include confidence notes.",
+                    ],
+                },
+                "notes": "none",
+            }
+        ],
+        "default_selected_preset_id": "preset-support-ticket",
+        "preset_application_behavior": "Preset apply fills controls only; no run starts.",
+        "preset_execution_behavior": "Run executes guardrails and main flow explicitly.",
+    }
+    payload["runtime_input_and_guardrails"] = {
+        "accepts_runtime_inputs": True,
+        "supported_input_modalities": ["text"],
+        "input_capture_summary": "Input view accepts text area edits and seeded preset application.",
+        "guardrails_pipeline_summary": [
+            "Deterministic type/size validation.",
+            "Relevance structured-output model verdict.",
+            "Safety structured-output model verdict.",
+        ],
+        "relevance_check_summary": "Server calls relevance classifier with structured JSON verdict.",
+        "safety_check_summary": "Server calls safety classifier with structured JSON verdict.",
+        "user_visible_outcomes_on_reject": [
+            "Inline warning appears in input panel.",
+            "Toast explains why execution was canceled.",
+        ],
+        "cancel_flow_behavior": "Reject verdict cancels main call and preserves editable input state.",
+        "presets_go_through_same_guardrails": True,
+    }
+    proxied_artifact = _ArtifactModelDumpProxy(artifact, payload)
+
+    markdown = render_demo_spec_markdown(proxied_artifact)
+
+    assert "preset-support-ticket" in markdown
+    assert "Preset apply fills controls only; no run starts." in markdown
+    assert "Run executes guardrails and main flow explicitly." in markdown
+    assert "## Runtime Input + Guardrails" in markdown
+    assert "- Supported input modalities:" in markdown
+    assert "Server calls relevance classifier with structured JSON verdict." in markdown
+    assert "Reject verdict cancels main call and preserves editable input state." in markdown
+
+
+def test_render_code_spec_markdown_includes_runtime_guardrails_and_skill_sections() -> None:
+    artifact = CodeSpecArtifact.model_validate(_code_spec_payload())
+
+    markdown = render_code_spec_markdown(artifact)
+
+    assert "#### Runtime Guardrails Plan" in markdown
+    assert "- Preset inputs integration coverage:" in markdown
+    assert "## Agent Skills To Apply" in markdown
+    assert "runtime-input-guardrails-server-side" in markdown
+
+
+def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present() -> None:
+    artifact = CodeSpecArtifact.model_validate(_code_spec_payload())
+    payload = artifact.model_dump(mode="json")
+    payload["ai_seam"]["guardrails"]["runtime_guardrails_plan"] = {
+        "server_side_only": True,
+        "deterministic_type_checks": [
+            "Reject unsupported MIME types and oversized payloads.",
+            "Reject malformed UTF-8 or undecodable attachments.",
+        ],
+        "relevance_model_call": "responses:gpt-5.2",
+        "relevance_prompt_contract": "Pass capability scope, input modality, and normalized payload.",
+        "relevance_output_schema": "RelevanceVerdict { is_relevant, reason, user_message }",
+        "safety_model_call": "responses:gpt-5.2",
+        "safety_prompt_contract": "Pass normalized payload and policy categories for safety check.",
+        "safety_output_schema": "SafetyVerdict { is_safe, reason, user_message }",
+        "verdict_handling": "unsupported/reject short-circuit with user message; allow proceeds.",
+        "logging_policy": "Log only request IDs, timings, verdicts, and parse outcomes.",
+    }
+    payload["testing_strategy"]["preset_inputs_integration_coverage"] = (
+        "Iterate each preset through guardrails in mocked tests; optional live tier runs one preset."
+    )
+    payload["agent_skills_to_apply"] = [
+        "runtime-input-guardrails-server-side",
+        "synthetic-input-presets",
+        "canonical-spec-format-parity",
+    ]
+    proxied_artifact = _ArtifactModelDumpProxy(artifact, payload)
+
+    markdown = render_code_spec_markdown(proxied_artifact)
+
+    assert "- Server-side only: Yes" in markdown
+    assert "- Deterministic type checks:" in markdown
+    assert "- Relevance model call: responses:gpt-5.2" in markdown
+    assert "- Safety model call: responses:gpt-5.2" in markdown
+    assert "Iterate each preset through guardrails in mocked tests" in markdown
+    assert "- runtime-input-guardrails-server-side" in markdown
+    assert "- synthetic-input-presets" in markdown
