@@ -1,0 +1,173 @@
+<coding_agent_prompt>
+  <meta>
+    <task_id>G1</task_id>
+    <task_name>Environment-based OpenAI API key loading + README instructions</task_name>
+  </meta>
+
+  <repo_inspection>
+    <observed_files>
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py">
+        <notes>
+          <note>Phase-3 schema exists as Pydantic models with strict extra="forbid".</note>
+          <note>CodeSpecArtifact currently has openai_integration but no runtime_configuration/readme_requirements fields.</note>
+        </notes>
+      </file>
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py">
+        <notes>
+          <note>Global hard rules and phase-specific rules/checklists exist, but do not mention env key loading or README requirements.</note>
+          <note>Prompt builder uses schema_excerpt_json(openai_compatible_schema(...)) and “Return JSON only” anti-drift constraints.</note>
+        </notes>
+      </file>
+    </observed_files>
+  </repo_inspection>
+
+  <objective>
+    <summary>
+      Update the phase-3 CodeSpec schema and prompting rules so every generated CodeSpec explicitly requires:
+      (1) reading OPENAI_API_KEY from environment (via an env file),
+      (2) shipping an .env.example (or equivalent),
+      (3) failing fast with a clear UI error message when missing,
+      (4) README setup steps for env file placement and local run.
+    </summary>
+  </objective>
+
+  <implementation_plan>
+    <step index="1" title="Add schema fields to CodeSpecArtifact (required)">
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py" />
+      <changes>
+        <add_models>
+          <model name="RuntimeConfiguration" base="StrictSchemaModel">
+            <field name="env_var_name" type="str" required="true">
+              <description>Environment variable name required for OpenAI auth (must be OPENAI_API_KEY).</description>
+              <constraint>Must equal literal string "OPENAI_API_KEY" (use Literal[&quot;OPENAI_API_KEY&quot;]).</constraint>
+            </field>
+            <field name="env_file_name" type="str" required="true">
+              <description>Name/location convention for the env file used in local runs (e.g., ".env").</description>
+            </field>
+            <field name="env_example_file" type="str" required="true">
+              <description>Required example env file committed to repo (must be ".env.example" or equivalent).</description>
+            </field>
+            <field name="env_example_required" type="bool" required="true">
+              <description>Must be true: repo includes an env example file.</description>
+              <constraint>Literal[True].</constraint>
+            </field>
+            <field name="load_strategy" type="str" required="true">
+              <description>
+                Concrete runtime approach for loading env vars (e.g., platform env first; then load from env_file_name in local dev;
+                never hardcode secrets; never commit real keys).
+              </description>
+            </field>
+            <field name="missing_key_fail_fast_behavior" type="str" required="true">
+              <description>
+                Must specify fail-fast behavior with a clear UI-visible error state/message when OPENAI_API_KEY is missing.
+                Include what the UI shows and how the app prevents further AI calls until fixed.
+              </description>
+            </field>
+          </model>
+
+          <model name="ReadmeRequirements" base="StrictSchemaModel">
+            <field name="setup_steps" type="list[str]" required="true">
+              <description>Exact step-by-step setup instructions (including creating/copying env file and adding OPENAI_API_KEY).</description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="env_file_instructions" type="str" required="true">
+              <description>
+                Exact instructions: where to place the env file, what to name it, and how to fill it.
+              </description>
+            </field>
+            <field name="local_run_instructions" type="str" required="true">
+              <description>Exact local run commands/steps (as text) appropriate to the demo’s stack constraints.</description>
+            </field>
+            <field name="troubleshooting" type="list[str]" required="true">
+              <description>
+                Troubleshooting bullets including missing-key symptom and resolution, and any common env-loading gotchas.
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+          </model>
+        </add_models>
+
+        <modify_existing_model name="CodeSpecArtifact">
+          <add_required_field name="runtime_configuration" type="RuntimeConfiguration">
+            <description>Required runtime configuration contract for env-based OpenAI key loading.</description>
+          </add_required_field>
+          <add_required_field name="readme_requirements" type="ReadmeRequirements">
+            <description>Required README content contract for setup and local run.</description>
+          </add_required_field>
+          <notes>
+            <note>Keep model_config extra="forbid" as-is.</note>
+            <note>Ensure new fields are required (no default, no Optional).</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+      <acceptance_criteria>
+        <criterion>CodeSpecArtifact JSON schema includes runtime_configuration and readme_requirements as required properties.</criterion>
+        <criterion>runtime_configuration enforces OPENAI_API_KEY via Literal and requires env example file + fail-fast UI behavior.</criterion>
+        <criterion>Schema remains compatible with strict structured outputs (additionalProperties:false, required includes all properties).</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="2" title="Update phase-3 prompting rules to enforce G1 requirements">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <update_global_hard_rules>
+          <add_rule>
+            Every demo must load OPENAI_API_KEY from environment (via an env file for local dev), include an .env.example,
+            and fail fast with a clear UI error message when the key is missing.
+          </add_rule>
+          <add_rule>
+            CodeSpec must include explicit README setup steps: env file placement/naming, how to set OPENAI_API_KEY, and how to run locally.
+          </add_rule>
+        </update_global_hard_rules>
+
+        <update_phase_rules phase="code_spec">
+          <add_rule>
+            Specify runtime configuration: where env vars come from, env file convention, .env.example requirement, and fail-fast UI error state.
+          </add_rule>
+          <add_rule>
+            Include README requirements with exact setup + local run steps and troubleshooting for missing OPENAI_API_KEY.
+          </add_rule>
+        </update_phase_rules>
+
+        <update_phase_priority_checklist phase="code_spec">
+          <add_item>Include runtime_configuration requiring OPENAI_API_KEY via env + .env.example + UI fail-fast missing-key behavior.</add_item>
+          <add_item>Include readme_requirements with explicit env file setup steps and local run instructions.</add_item>
+        </update_phase_priority_checklist>
+
+        <notes>
+          <note>Do not add prose outside JSON; keep “Return JSON only” constraints.</note>
+          <note>Keep scope limited to spec generation; do not implement app runtime code here.</note>
+        </notes>
+      </changes>
+      <acceptance_criteria>
+        <criterion>Phase-3 developer prompt includes explicit G1 rules as hard constraints.</criterion>
+        <criterion>Phase-3 user prompt checklist includes G1 items so the model reliably populates the new schema fields.</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="3" title="Safety/compatibility check: structured outputs strict-mode">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <verify>
+          <item>
+            Confirm openai_compatible_schema() still produces valid strict JSON schema after adding nested objects:
+            - additionalProperties:false on all object nodes
+            - required includes all properties everywhere
+            - $ref has no sibling keywords
+          </item>
+        </verify>
+      </changes>
+      <acceptance_criteria>
+        <criterion>No schema transformation regressions; structured-output call remains strict-compatible.</criterion>
+      </acceptance_criteria>
+    </step>
+  </implementation_plan>
+
+  <definition_of_done>
+    <checks>
+      <check>Generated CodeSpec always contains runtime_configuration requiring OPENAI_API_KEY, an env file convention, and .env.example requirement.</check>
+      <check>Generated CodeSpec always contains readme_requirements with exact setup + run steps and troubleshooting.</check>
+      <check>Prompts enforce missing-key fail-fast UI behavior as a requirement (not optional).</check>
+    </checks>
+  </definition_of_done>
+</coding_agent_prompt>

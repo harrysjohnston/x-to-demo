@@ -136,6 +136,7 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - One pipeline run produces one code spec artifact set.
 - Pipeline is synchronous per request.
 - Output is designed for demo-build handoff, not production architecture.
+- Phase-3 code spec artifacts now require `runtime_configuration` and `readme_requirements`, including env-based `OPENAI_API_KEY` loading, an example env file, fail-fast missing-key UI behavior, and explicit local setup/run instructions.
 - Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
 
 ## Related Docs

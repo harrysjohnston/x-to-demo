@@ -346,6 +346,38 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "post_processing": "Normalize field ordering before UI rendering.",
             },
         },
+        "runtime_configuration": {
+            "env_var_name": "OPENAI_API_KEY",
+            "env_file_name": ".env",
+            "env_example_file": "config/env.example",
+            "env_example_required": True,
+            "load_strategy": (
+                "Read OPENAI_API_KEY from process environment first; in local development load "
+                ".env values before startup; never commit real keys."
+            ),
+            "missing_key_fail_fast_behavior": (
+                "If OPENAI_API_KEY is missing, block run actions and show a visible error banner "
+                "with setup guidance until the key is configured."
+            ),
+        },
+        "readme_requirements": {
+            "setup_steps": [
+                "Copy config/env.example to .env in the project root.",
+                "Set OPENAI_API_KEY in .env before starting services.",
+                "Run pnpm dev:full and open the web app.",
+            ],
+            "env_file_instructions": (
+                "Place .env at repository root, keep config/env.example committed, and only set "
+                "real OPENAI_API_KEY values in local .env."
+            ),
+            "local_run_instructions": (
+                "Start services with pnpm dev:full, then open http://localhost:3000 to run the demo."
+            ),
+            "troubleshooting": [
+                "If the key is missing, the UI shows a blocking configuration error and disables run.",
+                "If env values are not loaded, verify .env exists at repo root and restart services.",
+            ],
+        },
         "project_changes": ["apps/web/components/XToDemoStudio.tsx"],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
         "state_model": {"fields": ["xInput", "phaseStatus", "artifacts"]},

@@ -76,6 +76,13 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Must map each headline demo item to selected API(s) and justify each mapping."
         in developer_prompt
     )
+    assert "Every demo must load OPENAI_API_KEY from environment" in developer_prompt
+    assert "CodeSpec must include explicit README setup instructions" in developer_prompt
+    assert (
+        "Specify runtime configuration for environment-based OPENAI_API_KEY loading"
+        in developer_prompt
+    )
+    assert "Include README requirements with exact setup steps" in developer_prompt
     assert "Choose OpenAI API(s) and initial prompts aligned to headline items." in user_prompt
     assert "If any headline item is voice, include Realtime." in user_prompt
     assert (
@@ -87,6 +94,8 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Specify synthetic data implementation for deterministic first launch and reruns."
         in user_prompt
     )
+    assert "Include runtime_configuration requiring OPENAI_API_KEY via environment" in user_prompt
+    assert "Include readme_requirements with explicit env-file setup" in user_prompt
     assert (
         "Keep tooling plan consistent with earlier phases and explain tool-call visibility in UI."
         in user_prompt
@@ -136,6 +145,8 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "synthetic_data_implementation" in required
     assert "consistency_trace" in required
     assert "tooling_plan" in required
+    assert "runtime_configuration" in required
+    assert "readme_requirements" in required
 
     openai_ref = schema["properties"]["openai_integration"]["$ref"].split("/")[-1]
     openai_required = set(schema["$defs"][openai_ref].get("required", []))
@@ -143,6 +154,21 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "api_usage_by_headline_item" in openai_required
     assert "covers_requires_voice" in openai_required
     assert "covers_requires_tool_loop" in openai_required
+
+    runtime_ref = schema["properties"]["runtime_configuration"]["$ref"].split("/")[-1]
+    runtime_required = set(schema["$defs"][runtime_ref].get("required", []))
+    assert "env_var_name" in runtime_required
+    assert "env_example_required" in runtime_required
+    runtime_props = schema["$defs"][runtime_ref]["properties"]
+    assert runtime_props["env_var_name"]["const"] == "OPENAI_API_KEY"
+    assert runtime_props["env_example_required"]["const"] is True
+
+    readme_ref = schema["properties"]["readme_requirements"]["$ref"].split("/")[-1]
+    readme_required = set(schema["$defs"][readme_ref].get("required", []))
+    assert "setup_steps" in readme_required
+    assert "env_file_instructions" in readme_required
+    assert "local_run_instructions" in readme_required
+    assert "troubleshooting" in readme_required
 
 
 def test_all_artifact_schemas_separate_spec_generation_metadata() -> None:
