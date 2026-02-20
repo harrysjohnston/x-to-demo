@@ -100,6 +100,16 @@ class AssumptionsAndConstraints(StrictSchemaModel):
 class GuardrailsSummary(StrictSchemaModel):
     """High-level guardrail behavior summary."""
 
+    unsupported_input_type_short_circuit: str = Field(
+        default=(
+            "Reject unsupported input modality/format with a user-visible message and cancel "
+            "the flow before any main model call."
+        ),
+        description=(
+            "How unsupported modality/format inputs are rejected, including user-visible "
+            "message behavior and explicit flow cancellation."
+        ),
+    )
     off_topic_short_circuit: str = Field(
         description="How off-topic requests are identified and short-circuited."
     )

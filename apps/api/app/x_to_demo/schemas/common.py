@@ -63,7 +63,7 @@ class SpecGenerationMetadata(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     schema_version: str = Field(
-        default="0.2",
+        default="0.3",
         description="Schema version for this artifact payload.",
     )
     status: ArtifactStatus = Field(

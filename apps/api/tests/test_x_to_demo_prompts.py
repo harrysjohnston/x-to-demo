@@ -36,6 +36,10 @@ def test_build_phase_prompts_includes_global_hard_rules() -> None:
     )
     assert "they must be synthetic, generated via appropriate OpenAI APIs" in developer_prompt
     assert "Demo startup must not depend on live asset generation" in developer_prompt
+    assert "Synthetic demo inputs are global selectable presets" in developer_prompt
+    assert "must pass server-side guardrails before any main AI call" in developer_prompt
+    assert "Guardrails pipeline order is mandatory" in developer_prompt
+    assert "Keep specs demo-specific" in developer_prompt
     assert (
         "Do not add fields, wrappers, markdown, or prose outside schema fields." in developer_prompt
     )
@@ -59,17 +63,30 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
     )
     assert "SyntheticDemoInputs must include required_assets" in developer_prompt
     assert "Interaction contracts must be complete" in developer_prompt
+    assert "runtime_input_and_guardrails" in developer_prompt
+    assert "Runtime guardrails must apply identically" in developer_prompt
     assert "not a presenter script." in developer_prompt
     assert (
         "Specify interactive walkthrough (auto-start on launch, retrigger path, cancellable controls)."
         in user_prompt
     )
     assert (
-        "Provide synthetic seed data, default first-run inputs, and expected first-run outputs."
+        "Define global synthetic presets with explicit selector/apply/run/reset UX" in user_prompt
+    )
+    assert (
+        "Include runtime_input_and_guardrails with server-side type/relevance/safety stages"
+        in user_prompt
+    )
+    assert (
+        "Ensure preset-applied inputs and manual runtime inputs pass through the same guardrails."
         in user_prompt
     )
     assert (
         "Include interaction_contracts for each minimalist view: enumerate every control"
+        in user_prompt
+    )
+    assert (
+        "Ensure interaction_contracts include preset selector, apply preset, run/submit, and reset/clear controls."
         in user_prompt
     )
     assert "Populate synthetic_demo_inputs.required_assets" in user_prompt
@@ -106,6 +123,13 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "TestingStrategy must include interaction_test_matrix where each DemoSpec control_id"
         in developer_prompt
     )
+    assert "server-side runtime guardrails plan with exactly two model calls" in developer_prompt
+    assert (
+        "structured-output contract strings for RelevanceVerdict and SafetyVerdict"
+        in developer_prompt
+    )
+    assert "CodeSpec must include agent_skills_to_apply" in developer_prompt
+    assert "TestingStrategy must include preset_inputs_integration_coverage" in developer_prompt
     assert "Validate every OpenAI request before sending" in developer_prompt
     assert "fail fast with a clear UI-visible error message" in developer_prompt
     assert "CodeSpec must include two-tier OpenAI tests" in developer_prompt
@@ -124,9 +148,18 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     assert "Otherwise default to Responses." in user_prompt
     assert "Map each headline item to selected API(s) and justify the mapping." in user_prompt
     assert (
-        "Specify synthetic data implementation for deterministic first launch and reruns."
+        "Include a server-side runtime guardrails plan with deterministic type checks plus exactly two model calls"
         in user_prompt
     )
+    assert (
+        "Define structured verdict contracts for relevance and safety guardrail calls"
+        in user_prompt
+    )
+    assert (
+        "Specify synthetic preset implementation where default selection/apply populates UI only and run requires explicit action."
+        in user_prompt
+    )
+    assert "Include agent_skills_to_apply with runtime-input-guardrails-server-side" in user_prompt
     assert "Include asset_generation_plan (API/model per modality" in user_prompt
     assert (
         "Include WalkthroughImplementation.state_machine_model with explicit states/transitions"
@@ -148,6 +181,7 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         in user_prompt
     )
     assert "Include testing_strategy.synthetic_assets_validation" in user_prompt
+    assert "Include testing_strategy.preset_inputs_integration_coverage" in user_prompt
     assert "Include OpenAIIntegration.request_validation" in user_prompt
     assert "Include TestingStrategy.openai_test_tiers" in user_prompt
     assert "Set interaction_test_matrix.rule to include" in user_prompt
@@ -300,11 +334,24 @@ def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> Non
     }
 
 
+def test_feature_spec_schema_requires_unsupported_input_type_short_circuit() -> None:
+    schema = FeatureSpecArtifact.model_json_schema()
+    innovation_focus_ref = schema["properties"]["innovation_focus"]["$ref"].split("/")[-1]
+    innovation_focus_schema = schema["$defs"][innovation_focus_ref]
+    guardrails_ref = innovation_focus_schema["properties"]["guardrails_summary"]["$ref"].split("/")[
+        -1
+    ]
+    guardrails_schema = schema["$defs"][guardrails_ref]
+
+    assert "unsupported_input_type_short_circuit" in guardrails_schema["properties"]
+
+
 def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     schema = DemoSpecArtifact.model_json_schema()
     required = set(schema.get("required", []))
 
     assert "synthetic_demo_inputs" in required
+    assert "runtime_input_and_guardrails" in schema["properties"]
     assert "consistency_trace" in required
     assert "tooling_decision_trace" in required
     assert "interaction_requirements" in required
@@ -334,6 +381,11 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     synthetic_inputs_name = schema["properties"]["synthetic_demo_inputs"]["$ref"].split("/")[-1]
     synthetic_inputs_schema = schema["$defs"][synthetic_inputs_name]
     assert "required_assets" in set(synthetic_inputs_schema.get("required", []))
+    assert "default_first_run_inputs" not in synthetic_inputs_schema["properties"]
+    assert "input_presets" in synthetic_inputs_schema["properties"]
+    assert "default_selected_preset_id" in synthetic_inputs_schema["properties"]
+    assert "preset_application_behavior" in synthetic_inputs_schema["properties"]
+    assert "preset_execution_behavior" in synthetic_inputs_schema["properties"]
 
     asset_name = synthetic_inputs_schema["properties"]["required_assets"]["items"]["$ref"].split(
         "/"
@@ -351,11 +403,31 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     }
     assert required_asset_schema["properties"]["must_be_labeled_synthetic"]["const"] is True
 
+    runtime_guardrails_name = schema["properties"]["runtime_input_and_guardrails"]["$ref"].split(
+        "/"
+    )[-1]
+    runtime_guardrails_schema = schema["$defs"][runtime_guardrails_name]
+    assert "accepts_runtime_inputs" in runtime_guardrails_schema["properties"]
+    assert "cancel_flow_behavior" in runtime_guardrails_schema["properties"]
+    assert "guardrails_pipeline_summary" in runtime_guardrails_schema["properties"]
+    assert "input_capture_summary" in runtime_guardrails_schema["properties"]
+    assert "presets_go_through_same_guardrails" in runtime_guardrails_schema["properties"]
+    assert "relevance_check_summary" in runtime_guardrails_schema["properties"]
+    assert "safety_check_summary" in runtime_guardrails_schema["properties"]
+    assert "supported_input_modalities" in runtime_guardrails_schema["properties"]
+    assert "user_visible_outcomes_on_reject" in runtime_guardrails_schema["properties"]
+    assert runtime_guardrails_schema["properties"]["accepts_runtime_inputs"]["const"] is True
+    assert (
+        runtime_guardrails_schema["properties"]["presets_go_through_same_guardrails"]["const"]
+        is True
+    )
+
 
 def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> None:
     schema = CodeSpecArtifact.model_json_schema()
     required = set(schema.get("required", []))
 
+    assert "agent_skills_to_apply" in schema["properties"]
     assert "synthetic_data_implementation" in required
     assert "asset_generation_plan" in required
     assert "consistency_trace" in required
@@ -368,6 +440,16 @@ def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> 
     assert "covers_requires_voice" in openai_required
     assert "covers_requires_tool_loop" in openai_required
     assert "request_validation" in openai_required
+
+    ai_seam_ref = schema["properties"]["ai_seam"]["$ref"].split("/")[-1]
+    ai_seam_schema = schema["$defs"][ai_seam_ref]
+    guardrails_ref = ai_seam_schema["properties"]["guardrails"]["$ref"].split("/")[-1]
+    guardrails_schema = schema["$defs"][guardrails_ref]
+    assert "runtime_guardrails_plan" in guardrails_schema["properties"]
+
+    testing_ref = schema["properties"]["testing_strategy"]["$ref"].split("/")[-1]
+    testing_schema = schema["$defs"][testing_ref]
+    assert "preset_inputs_integration_coverage" in testing_schema["properties"]
 
 
 def test_all_artifact_schemas_separate_spec_generation_metadata() -> None:

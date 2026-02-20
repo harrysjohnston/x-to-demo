@@ -74,5 +74,43 @@ pnpm test
 Run pre-commit hooks over all files:
 
 ```bash
-uv run --project apps/api --extra dev python -m pre_commit run --all-files
+pnpm ci:local
 ```
+
+Or run individual jobs:
+
+```bash
+./scripts/ci-local --pre-commit   # pre-commit on all files (CI checks everything, not just staged)
+./scripts/ci-local --docker       # Docker build + health checks
+```
+
+**Why CI might fail when local checks pass:**
+
+- **Pre-commit**: CI runs `pre_commit run --all-files`; a normal `pre-commit run` only checks staged files, so unstaged or untracked issues are missed.
+- **Pre-commit**: CI installs deps from repo root with `uv pip install --system`; your venv or tool versions may differ.
+- **Docker**: CI runs on `ubuntu-latest`; platform/arch differences (e.g. macOS vs Linux) can cause build or runtime failures.
+
+## Current Prototype Constraints
+
+- Input X currently optimized for text-like raw inputs.
+- One pipeline run produces one code spec artifact set.
+- Pipeline is synchronous per request.
+- Output is designed for demo-build handoff, not production architecture.
+- Phase-2 `DemoSpec` artifacts now require `interaction_contracts` that enumerate every per-screen interactive control with behavior, observable effects, enable/disable rules, and loading-state expectations.
+- Phase-2 `DemoSpec` artifacts now require `synthetic_demo_inputs.required_assets` (empty list allowed) to inventory every required synthetic text/image/audio asset with purpose, usage mapping, format/size constraints, and explicit synthetic labels.
+- Phase-3 `CodeSpec` artifacts now require `asset_generation_plan` describing per-modality OpenAI API/model choices, local generation scripts/commands, repo storage/naming, app loading/labeling behavior, mandatory guardrails, and `no_live_generation_on_startup=true`.
+- Phase-3 `CodeSpec` artifacts now require `testing_strategy.interaction_test_matrix` that maps each control id to enabled/disabled/loading assertions under the no-inert-controls rule.
+- Phase-3 `CodeSpec` artifacts now require `testing_strategy.synthetic_assets_validation` proving synthetic assets exist, pass basic file sanity checks, and that seeded startup flows do not depend on live generation calls.
+- Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
+- Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
+- Artifact schema version is now `0.3`; pre-`0.3` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
+
+## Related Docs
+
+- Master plan: `/.plans/x-to-demo-master-plan.md`
+- Pipeline simplification plan: `/.plans/x-to-demo-pipeline-simplification.md`
+- Output contracts: `/.plans/x-to-demo-output-contracts.md`
+- Deployment: `/docs/deployment.md`
+- Architecture notes: `/architecture_decisions.md`
+
+Last reviewed: 2026-02-20
