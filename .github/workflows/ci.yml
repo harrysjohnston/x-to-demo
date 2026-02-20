@@ -68,6 +68,7 @@ jobs:
           file: apps/api/Dockerfile
           target: production
           push: false
+          load: true
           tags: x-to-demo-api:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -79,6 +80,7 @@ jobs:
           file: apps/web/Dockerfile
           target: production
           push: false
+          load: true
           tags: x-to-demo-web:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
