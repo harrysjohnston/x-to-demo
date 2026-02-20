@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.auth import get_current_user
 from app.schemas import (
     ResponseEnvelope,
     XToDemoArtifact,
@@ -25,9 +23,6 @@ from app.services.x_to_demo_pipeline import (
     XToDemoPipelineService,
     get_x_to_demo_pipeline_service,
 )
-
-if TYPE_CHECKING:
-    from app.models import User
 
 router = APIRouter(prefix="/x-to-demo", tags=["x-to-demo"])
 
@@ -88,7 +83,6 @@ def _run_result_to_schema(result: PipelineRunResult) -> XToDemoRunResponse:
 )
 def create_x_to_demo_run(
     request: XToDemoRunRequest,
-    current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope[XToDemoRunResponse]:
     """Run the X-to-Demo pipeline and return generated artifacts."""
@@ -97,7 +91,7 @@ def create_x_to_demo_run(
             x_input=request.x_input,
             additional_context=request.additional_context,
             feature_name_hint=request.feature_name_hint,
-            user_id=current_user.id or 0,
+            user_id=0,
             model=request.model,
             reasoning_effort=request.reasoning_effort,
             stop_after_phase=request.stop_after_phase,
@@ -127,7 +121,6 @@ def create_x_to_demo_run(
 )
 def get_x_to_demo_run(
     run_id: str,
-    _current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope[XToDemoRunDetailResponse]:
     """Fetch run manifest and current artifact status."""
@@ -189,7 +182,6 @@ def get_x_to_demo_run(
 def get_x_to_demo_artifact(
     run_id: str,
     phase_key: str,
-    _current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope[XToDemoArtifactResponse]:
     """Fetch a single phase artifact in markdown + canonical JSON form."""
@@ -215,7 +207,6 @@ def update_x_to_demo_artifact(
     run_id: str,
     phase_key: str,
     request: XToDemoUpdateArtifactRequest,
-    _current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope[XToDemoArtifactResponse]:
     """Validate and persist edited artifact content."""
@@ -247,14 +238,13 @@ def update_x_to_demo_artifact(
 def resume_x_to_demo_run(
     run_id: str,
     request: XToDemoResumeRequest,
-    current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> ResponseEnvelope[XToDemoRunResponse]:
     """Resume a run from next incomplete (or selected) phase."""
     try:
         result = pipeline_service.resume(
             run_id=run_id,
-            user_id=current_user.id or 0,
+            user_id=0,
             from_phase=request.from_phase,
             stop_after_phase=request.stop_after_phase,
             use_edited_artifacts=request.use_edited_artifacts,
@@ -280,7 +270,6 @@ def resume_x_to_demo_run(
 def download_x_to_demo_artifact(
     run_id: str,
     phase_key: str,
-    _current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> Response:
     """Download a single artifact markdown file."""
@@ -301,7 +290,6 @@ def download_x_to_demo_artifact(
 @router.get("/runs/{run_id}/download")
 def download_x_to_demo_run(
     run_id: str,
-    _current_user: User = Depends(get_current_user),
     pipeline_service: XToDemoPipelineService = Depends(get_pipeline_service),
 ) -> Response:
     """Download all artifacts + manifest for a run as zip."""

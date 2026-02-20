@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { useSSE } from "@/hooks/useSSE";
 import { ApiError } from "@/lib/api";
 import {
   downloadBlob,
@@ -38,17 +37,6 @@ const PIPELINE_PHASES: Array<{ key: XToDemoPhaseKey; title: string }> = [
 ];
 
 const PHASE_KEYS = PIPELINE_PHASES.map((phase) => phase.key);
-
-interface XToDemoRunProgressEventData {
-  pipeline: string;
-  run_id: string;
-  status: string;
-  phase_key?: XToDemoPhaseKey;
-  error?: string;
-  artifact_version?: string;
-  artifact_paths?: { markdown?: string; json?: string };
-  is_resume?: boolean;
-}
 
 const MAX_INPUT_CHARS = 60000;
 
@@ -131,12 +119,6 @@ export function XToDemoStudio() {
     return runResult.artifacts.find((artifact) => artifact.phase_key === activeArtifactTab) ?? null;
   }, [runResult, activeArtifactTab]);
 
-  const { lastEvent } = useSSE<XToDemoRunProgressEventData>({
-    enabled: true,
-    eventTypes: ["x_to_demo_run_progress"],
-    maxEvents: 30,
-  });
-
   const hydrateFromRunResult = useCallback((result: XToDemoRunResponse) => {
     setRunResult(result);
     setTrackedRunId(result.run_id);
@@ -149,14 +131,6 @@ export function XToDemoStudio() {
         result.artifacts[result.artifacts.length - 1]?.phase_key ?? result.artifacts[0]?.phase_key;
       setActiveArtifactTab(tab);
     }
-  }, []);
-
-  const markPhaseComplete = useCallback((phaseKey: XToDemoPhaseKey) => {
-    setCompletedPhaseKeys((previous) =>
-      previous.includes(phaseKey) ? previous : [...previous, phaseKey],
-    );
-    setFailedPhaseKeys((previous) => previous.filter((key) => key !== phaseKey));
-    setStalePhaseKeys((previous) => previous.filter((key) => key !== phaseKey));
   }, []);
 
   useEffect(() => {
@@ -174,72 +148,6 @@ export function XToDemoStudio() {
     }
     setArtifactJsonDraft(JSON.stringify(activeArtifact.json_content, null, 2));
   }, [activeArtifact]);
-
-  useEffect(() => {
-    if (lastEvent?.event !== "x_to_demo_run_progress") return;
-    if (!lastEvent.data || typeof lastEvent.data !== "object" || Array.isArray(lastEvent.data)) {
-      return;
-    }
-
-    const payload = lastEvent.data as Partial<XToDemoRunProgressEventData>;
-    if (payload.pipeline !== "x-to-demo") return;
-    if (typeof payload.run_id !== "string" || typeof payload.status !== "string") return;
-
-    if (trackedRunId && payload.run_id !== trackedRunId) return;
-    if (!trackedRunId) {
-      setTrackedRunId(payload.run_id);
-    }
-
-    if (payload.status === "run_started") {
-      setActivePhaseKey(null);
-      setCompletedPhaseKeys([]);
-      setFailedPhaseKeys([]);
-      setStalePhaseKeys([]);
-      return;
-    }
-
-    if (payload.status === "phase_started") {
-      if (payload.phase_key) {
-        setActivePhaseKey(payload.phase_key);
-      }
-      return;
-    }
-
-    if (payload.status === "phase_completed") {
-      if (payload.phase_key) {
-        markPhaseComplete(payload.phase_key);
-      }
-      setActivePhaseKey(null);
-      return;
-    }
-
-    if (payload.status === "phase_failed") {
-      if (payload.phase_key) {
-        setFailedPhaseKeys((previous) =>
-          previous.includes(payload.phase_key as XToDemoPhaseKey)
-            ? previous
-            : [...previous, payload.phase_key as XToDemoPhaseKey],
-        );
-      }
-      if (typeof payload.error === "string" && payload.error.trim()) {
-        setError(payload.error);
-      }
-      setActivePhaseKey(null);
-      return;
-    }
-
-    if (payload.status === "run_failed") {
-      if (typeof payload.error === "string" && payload.error.trim()) {
-        setError(payload.error);
-      }
-      setActivePhaseKey(null);
-      return;
-    }
-
-    if (payload.status === "run_completed") {
-      setActivePhaseKey(null);
-    }
-  }, [lastEvent, markPhaseComplete, trackedRunId]);
 
   const applyTranscriptFile = async (file: File) => {
     setError(null);

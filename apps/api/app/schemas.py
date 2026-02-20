@@ -50,14 +50,6 @@ class SSEEvent(BaseModel):
     id: str | None = Field(default=None, description="Event ID for resumption (Last-Event-ID)")
 
 
-class CreateUploadRequest(BaseModel):
-    """Request schema for creating a presigned upload URL."""
-
-    filename: str = Field(description="Original filename")
-    content_type: str = Field(description="MIME type (e.g., image/png)")
-    size_bytes: int | None = Field(default=None, description="File size in bytes (optional)")
-
-
 class XToDemoRunRequest(BaseModel):
     """Request schema for running the end-to-end X-to-Demo pipeline."""
 

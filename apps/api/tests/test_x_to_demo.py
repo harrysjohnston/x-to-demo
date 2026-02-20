@@ -224,22 +224,27 @@ def client_with_fake_pipeline_fixture(
     app.dependency_overrides.pop(x_to_demo.get_pipeline_service, None)
 
 
-def test_x_to_demo_run_requires_auth(client: TestClient) -> None:
-    response = client.post(
+def test_x_to_demo_run_does_not_require_auth(
+    client_with_fake_pipeline: TestClient, fake_pipeline_service: FakePipelineService
+) -> None:
+    response = client_with_fake_pipeline.post(
         "/api/v1/x-to-demo/runs",
-        json={"x_input": "This input has enough content to satisfy validation."},
+        json={
+            "x_input": (
+                "Users need a faster way to turn noisy project notes into a demo-ready code spec."
+            )
+        },
     )
-    assert response.status_code == 401
+    assert response.status_code == 201
+    assert fake_pipeline_service.calls[0]["user_id"] == 0
 
 
 def test_x_to_demo_run_success(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
     fake_pipeline_service: FakePipelineService,
 ) -> None:
     response = client_with_fake_pipeline.post(
         "/api/v1/x-to-demo/runs",
-        headers=auth_headers,
         json={
             "x_input": (
                 "Team discussed that users lose track of follow-ups after meetings, "
@@ -270,11 +275,9 @@ def test_x_to_demo_run_success(
 
 def test_x_to_demo_run_rejects_blank_input(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
 ) -> None:
     response = client_with_fake_pipeline.post(
         "/api/v1/x-to-demo/runs",
-        headers=auth_headers,
         json={"x_input": " " * 24},
     )
     assert response.status_code == 400
@@ -283,9 +286,8 @@ def test_x_to_demo_run_rejects_blank_input(
 
 def test_x_to_demo_get_run_detail_success(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
 ) -> None:
-    response = client_with_fake_pipeline.get("/api/v1/x-to-demo/runs/run-1", headers=auth_headers)
+    response = client_with_fake_pipeline.get("/api/v1/x-to-demo/runs/run-1")
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["run_id"] == "run-1"
@@ -295,12 +297,10 @@ def test_x_to_demo_get_run_detail_success(
 
 def test_x_to_demo_update_artifact_success(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
     fake_pipeline_service: FakePipelineService,
 ) -> None:
     response = client_with_fake_pipeline.put(
         "/api/v1/x-to-demo/runs/run-1/artifacts/feature_spec",
-        headers=auth_headers,
         json={"json_content": {"feature_name": "Edited Feature"}},
     )
     assert response.status_code == 200
@@ -310,12 +310,10 @@ def test_x_to_demo_update_artifact_success(
 
 def test_x_to_demo_resume_success(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
     fake_pipeline_service: FakePipelineService,
 ) -> None:
     response = client_with_fake_pipeline.post(
         "/api/v1/x-to-demo/runs/run-1/resume",
-        headers=auth_headers,
         json={"from_phase": "demo_spec", "stop_after_phase": "code_spec"},
     )
     assert response.status_code == 200
@@ -325,18 +323,15 @@ def test_x_to_demo_resume_success(
 
 def test_x_to_demo_download_artifact_and_bundle(
     client_with_fake_pipeline: TestClient,
-    auth_headers: dict[str, str],
 ) -> None:
     artifact_response = client_with_fake_pipeline.get(
         "/api/v1/x-to-demo/runs/run-1/artifacts/feature_spec/download",
-        headers=auth_headers,
     )
     assert artifact_response.status_code == 200
     assert artifact_response.headers["content-type"].startswith("text/markdown")
 
     bundle_response = client_with_fake_pipeline.get(
         "/api/v1/x-to-demo/runs/run-1/download",
-        headers=auth_headers,
     )
     assert bundle_response.status_code == 200
     assert bundle_response.headers["content-type"].startswith("application/zip")

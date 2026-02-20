@@ -20,7 +20,7 @@ repos:
       # Format checks (fastest - just formatting)
       - id: ruff-format
         name: ruff (format)
-        entry: python -m ruff format apps/api
+        entry: uv run --project apps/api --extra dev python -m ruff format apps/api
         language: system
         pass_filenames: false
 
@@ -33,7 +33,7 @@ repos:
       # Lint checks (fast - code style/patterns)
       - id: ruff-check
         name: ruff (lint)
-        entry: python -m ruff check apps/api --fix
+        entry: uv run --project apps/api --extra dev python -m ruff check apps/api --fix
         language: system
         pass_filenames: false
 

@@ -6,9 +6,9 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "biome check app components lib hooks --files-ignore-unknown=true",
+    "lint": "biome check app components lib --files-ignore-unknown=true",
     "typecheck": "tsc --noEmit",
-    "format": "biome check --write app components lib hooks tests-e2e --files-ignore-unknown=true",
+    "format": "biome check --write app components lib tests-e2e --files-ignore-unknown=true",
     "test": "vitest run",
     "e2e": "playwright test"
   },
