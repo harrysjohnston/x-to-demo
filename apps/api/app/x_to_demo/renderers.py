@@ -96,6 +96,30 @@ def _text_or_embedded_data_lines(value: Any) -> list[str]:
     ]
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _list_of_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _list_of_dicts(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _yes_no_unknown(value: Any) -> str:
+    if isinstance(value, bool):
+        return _yes_no(value)
+    return "Not specified"
+
+
 _XML_LIST_WRAPPER = "item"
 _XML_EMPTY_LIST_MARKER = "_empty"
 
@@ -241,6 +265,88 @@ def render_feature_spec_markdown(artifact: FeatureSpecArtifact) -> str:
 
 
 def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
+    artifact_data = artifact.model_dump(mode="json")
+    synthetic_demo_inputs = _as_dict(artifact_data.get("synthetic_demo_inputs"))
+    runtime_input_and_guardrails = _as_dict(artifact_data.get("runtime_input_and_guardrails"))
+
+    preset_input_sets = _list_of_dicts(synthetic_demo_inputs.get("input_presets"))
+    if not preset_input_sets:
+        legacy_default_first_run = _as_dict(synthetic_demo_inputs.get("default_first_run_inputs"))
+        legacy_trigger_action = str(legacy_default_first_run.get("trigger_action", "")).strip()
+        fallback_preset_id = str(
+            synthetic_demo_inputs.get("default_selected_preset_id") or "legacy-first-run-preset"
+        )
+        preset_input_sets = [
+            {
+                "preset_id": fallback_preset_id,
+                "label": "Legacy default first-run inputs",
+                "ordered_inputs": _list_of_strings(legacy_default_first_run.get("ordered_inputs")),
+                "where_used_in_headline_flows": _list_of_strings(
+                    _as_dict(artifact_data.get("consistency_trace")).get(
+                        "phase1_headline_capability_refs"
+                    )
+                ),
+                "expected_outputs": synthetic_demo_inputs.get("expected_outputs", "Not specified"),
+                "notes": (
+                    legacy_trigger_action
+                    or "Derived from legacy default_first_run_inputs for markdown compatibility."
+                ),
+            }
+        ]
+
+    default_selected_preset_id = str(
+        synthetic_demo_inputs.get("default_selected_preset_id")
+        or preset_input_sets[0].get("preset_id")
+        or "Not specified"
+    )
+    preset_application_behavior = str(
+        synthetic_demo_inputs.get("preset_application_behavior")
+        or "Applying a preset populates UI inputs only and does not execute the flow."
+    )
+    preset_execution_behavior = str(
+        synthetic_demo_inputs.get("preset_execution_behavior")
+        or "Execution starts only after explicit user Run/Submit action."
+    )
+
+    fallback_modalities = sorted(
+        {
+            str(item.get("interaction_mode"))
+            for item in _list_of_dicts(artifact_data.get("headline_demo_items"))
+            if item.get("interaction_mode")
+        }
+    )
+    supported_modalities = (
+        _list_of_strings(runtime_input_and_guardrails.get("supported_input_modalities"))
+        or fallback_modalities
+    )
+    guardrails_pipeline_summary = _list_of_strings(
+        runtime_input_and_guardrails.get("guardrails_pipeline_summary")
+    ) or [
+        "Deterministic server-side type/format/size checks before any main AI call.",
+        "Relevance check via structured-output model verdict.",
+        "Safety check via structured-output model verdict.",
+    ]
+    user_visible_outcomes_on_reject = _list_of_strings(
+        runtime_input_and_guardrails.get("user_visible_outcomes_on_reject")
+    ) or ["Show a user-visible rejection message and keep inputs editable."]
+
+    input_capture_summary = str(
+        runtime_input_and_guardrails.get("input_capture_summary")
+        or "Runtime inputs are captured via interactive controls in the demo views."
+    )
+    relevance_check_summary = str(
+        runtime_input_and_guardrails.get("relevance_check_summary")
+        or "Relevance check summary not specified."
+    )
+    safety_check_summary = str(
+        runtime_input_and_guardrails.get("safety_check_summary")
+        or "Safety check summary not specified."
+    )
+    cancel_flow_behavior = str(
+        runtime_input_and_guardrails.get("cancel_flow_behavior")
+        or "On reject, cancel flow before main model call and allow user edits/retry."
+    )
+
     lines = [
         f"# Phase 2: Feature Spec -> Demo Spec: {artifact.feature_name}",
         "",
@@ -369,13 +475,31 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
             "### Seed Dataset",
             *_text_or_embedded_data_lines(artifact.synthetic_demo_inputs.seed_dataset),
             "",
-            "### Default First Run Inputs",
-            "- Ordered inputs:",
-            *_bullet_lines(artifact.synthetic_demo_inputs.default_first_run_inputs.ordered_inputs),
-            (
-                "- Trigger action: "
-                f"{artifact.synthetic_demo_inputs.default_first_run_inputs.trigger_action}"
-            ),
+            "### Input Presets",
+        ]
+    )
+
+    for index, preset in enumerate(preset_input_sets, start=1):
+        lines.extend(
+            [
+                f"#### Preset {index}: {preset.get('label', 'Unnamed preset')}",
+                f"- Preset ID: {preset.get('preset_id', 'Not specified')}",
+                "- Where used in headline flows:",
+                *_bullet_lines(_list_of_strings(preset.get("where_used_in_headline_flows"))),
+                "- Ordered inputs:",
+                *_bullet_lines(_list_of_strings(preset.get("ordered_inputs"))),
+                "- Expected outputs:",
+                *_text_or_embedded_data_lines(preset.get("expected_outputs", "Not specified")),
+                f"- Notes: {preset.get('notes', 'none')}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            f"- Default selected preset id: {default_selected_preset_id}",
+            f"- Preset application behavior: {preset_application_behavior}",
+            f"- Preset execution behavior: {preset_execution_behavior}",
             "",
             f"### Why This Data\n- {artifact.synthetic_demo_inputs.why_this_data}",
             "",
@@ -383,9 +507,6 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
                 "### Safety And Realism Notes\n"
                 f"- {artifact.synthetic_demo_inputs.safety_and_realism_notes}"
             ),
-            "",
-            "### Expected Outputs",
-            *_text_or_embedded_data_lines(artifact.synthetic_demo_inputs.expected_outputs),
             "",
             "### Required Synthetic Assets",
         ]
@@ -417,6 +538,26 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
 
     lines.extend(
         [
+            "## Runtime Input + Guardrails",
+            (
+                "- Accepts runtime inputs: "
+                f"{_yes_no_unknown(runtime_input_and_guardrails.get('accepts_runtime_inputs'))}"
+            ),
+            "- Supported input modalities:",
+            *_bullet_lines(supported_modalities),
+            f"- Input capture summary: {input_capture_summary}",
+            "- Guardrails pipeline summary:",
+            *_bullet_lines(guardrails_pipeline_summary),
+            f"- Relevance check summary: {relevance_check_summary}",
+            f"- Safety check summary: {safety_check_summary}",
+            "- User-visible outcomes on reject:",
+            *_bullet_lines(user_visible_outcomes_on_reject),
+            f"- Cancel flow behavior: {cancel_flow_behavior}",
+            (
+                "- Presets go through same guardrails: "
+                f"{_yes_no_unknown(runtime_input_and_guardrails.get('presets_go_through_same_guardrails'))}"
+            ),
+            "",
             "## Consistency Trace",
             "### Phase 1 Headline Capability Refs",
             *_bullet_lines(artifact.consistency_trace.phase1_headline_capability_refs),
@@ -468,6 +609,13 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
 
 
 def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
+    artifact_data = artifact.model_dump(mode="json")
+    ai_seam_data = _as_dict(artifact_data.get("ai_seam"))
+    ai_guardrails = _as_dict(ai_seam_data.get("guardrails"))
+    runtime_guardrails_plan = _as_dict(ai_guardrails.get("runtime_guardrails_plan"))
+    testing_strategy = _as_dict(artifact_data.get("testing_strategy"))
+    agent_skills_to_apply = _list_of_strings(artifact_data.get("agent_skills_to_apply"))
+
     lines = [
         f"# Phase 3: Demo Spec -> Code Spec: {artifact.feature_name}",
         "",
@@ -577,6 +725,35 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
             *_bullet_lines(artifact.ai_seam.guardrails.input_filters),
             f"- Refusal policy: {artifact.ai_seam.guardrails.refusal_policy}",
             (f"- Short-circuit behavior: {artifact.ai_seam.guardrails.short_circuit_behavior}"),
+            "#### Runtime Guardrails Plan",
+            (
+                "- Server-side only: "
+                f"{_yes_no_unknown(runtime_guardrails_plan.get('server_side_only'))}"
+            ),
+            "- Deterministic type checks:",
+            *_bullet_lines(
+                _list_of_strings(runtime_guardrails_plan.get("deterministic_type_checks"))
+            ),
+            f"- Relevance model call: {runtime_guardrails_plan.get('relevance_model_call', 'Not specified')}",
+            (
+                "- Relevance prompt contract: "
+                f"{runtime_guardrails_plan.get('relevance_prompt_contract', 'Not specified')}"
+            ),
+            (
+                "- Relevance output schema: "
+                f"{runtime_guardrails_plan.get('relevance_output_schema', 'Not specified')}"
+            ),
+            f"- Safety model call: {runtime_guardrails_plan.get('safety_model_call', 'Not specified')}",
+            (
+                "- Safety prompt contract: "
+                f"{runtime_guardrails_plan.get('safety_prompt_contract', 'Not specified')}"
+            ),
+            (
+                "- Safety output schema: "
+                f"{runtime_guardrails_plan.get('safety_output_schema', 'Not specified')}"
+            ),
+            f"- Verdict handling: {runtime_guardrails_plan.get('verdict_handling', 'Not specified')}",
+            f"- Logging policy: {runtime_guardrails_plan.get('logging_policy', 'Not specified')}",
             "",
         ]
     )
@@ -760,8 +937,15 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
                 "- Synthetic assets validation: "
                 f"{artifact.testing_strategy.synthetic_assets_validation}"
             ),
+            (
+                "- Preset inputs integration coverage: "
+                f"{testing_strategy.get('preset_inputs_integration_coverage', 'Not specified')}"
+            ),
             "### Verification Steps",
             *_bullet_lines(artifact.testing_strategy.verification_steps),
+            "",
+            "## Agent Skills To Apply",
+            *_bullet_lines(agent_skills_to_apply, empty_message="None specified"),
             "",
             "## UI Constraints",
             "### Minimalist Layout Rules",
