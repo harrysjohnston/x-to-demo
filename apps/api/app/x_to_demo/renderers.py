@@ -347,6 +347,36 @@ def render_demo_spec_markdown(artifact: DemoSpecArtifact) -> str:
             "### Expected Outputs",
             *_text_or_embedded_data_lines(artifact.synthetic_demo_inputs.expected_outputs),
             "",
+            "### Required Synthetic Assets",
+        ]
+    )
+
+    if not artifact.synthetic_demo_inputs.required_assets:
+        lines.extend(
+            [
+                "- None",
+                "",
+            ]
+        )
+    else:
+        for index, asset in enumerate(artifact.synthetic_demo_inputs.required_assets, start=1):
+            lines.extend(
+                [
+                    f"#### Asset {index}: {asset.asset_id}",
+                    f"- Type: {asset.asset_type}",
+                    f"- Purpose: {asset.purpose}",
+                    "- Where used in headline flows:",
+                    *_bullet_lines(asset.where_used_in_headline_flows),
+                    f"- Expected format: {asset.expected_format}",
+                    f"- Size constraints: {asset.size_constraints}",
+                    (f"- Must be labeled synthetic: {_yes_no(asset.must_be_labeled_synthetic)}"),
+                    f"- Synthetic label text: {asset.synthetic_label_text}",
+                    "",
+                ]
+            )
+
+    lines.extend(
+        [
             "## Consistency Trace",
             "### Phase 1 Headline Capability Refs",
             *_bullet_lines(artifact.consistency_trace.phase1_headline_capability_refs),
@@ -566,6 +596,62 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
                 f"{artifact.synthetic_data_implementation.determinism_guidance}"
             ),
             "",
+            "## Asset Generation Plan",
+            (
+                "- When assets are required: "
+                f"{artifact.asset_generation_plan.when_assets_are_required}"
+            ),
+            f"- Repo storage location: {artifact.asset_generation_plan.repo_storage_location}",
+            f"- Naming convention: {artifact.asset_generation_plan.naming_convention}",
+            (
+                "- App load/reference behavior: "
+                f"{artifact.asset_generation_plan.how_app_loads_and_references_assets}"
+            ),
+            (
+                "- Synthetic labeling in app: "
+                f"{artifact.asset_generation_plan.explicit_synthetic_labeling_in_app}"
+            ),
+            (
+                "- No live generation on startup: "
+                f"{_yes_no(artifact.asset_generation_plan.no_live_generation_on_startup)}"
+            ),
+            "### API And Model By Asset Type",
+        ]
+    )
+
+    for index, choice in enumerate(
+        artifact.asset_generation_plan.api_and_model_by_asset_type, start=1
+    ):
+        lines.extend(
+            [
+                f"#### Choice {index}: {choice.asset_type}",
+                f"- API surface: {choice.openai_api_surface}",
+                f"- Model: {choice.model}",
+                f"- Rationale: {choice.why_this_choice}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "### Generation Commands Or Scripts",
+            *_bullet_lines(artifact.asset_generation_plan.generation_commands_or_scripts),
+            "",
+            "### Guardrails",
+            (
+                "- No real person likeness: "
+                f"{_yes_no(artifact.asset_generation_plan.guardrails.no_real_person_likeness)}"
+            ),
+            (
+                "- No copyrighted brand assets: "
+                f"{_yes_no(artifact.asset_generation_plan.guardrails.no_copyrighted_brand_assets)}"
+            ),
+            f"- No PII: {_yes_no(artifact.asset_generation_plan.guardrails.no_pii)}",
+            (
+                "- Content safety notes: "
+                f"{artifact.asset_generation_plan.guardrails.content_safety_notes}"
+            ),
+            "",
             "## Consistency Trace",
             "### Phase 2 Headline Capability Refs",
             *_bullet_lines(artifact.consistency_trace.phase2_headline_capability_refs),
@@ -631,6 +717,10 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
             "",
             (f"- Acceptance scope rules: {artifact.testing_strategy.acceptance_tests_scope_rules}"),
             f"- Mocking instructions: {artifact.testing_strategy.mocking_instructions}",
+            (
+                "- Synthetic assets validation: "
+                f"{artifact.testing_strategy.synthetic_assets_validation}"
+            ),
             "### Verification Steps",
             *_bullet_lines(artifact.testing_strategy.verification_steps),
             "",

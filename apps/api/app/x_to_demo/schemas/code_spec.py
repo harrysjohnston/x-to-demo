@@ -181,6 +181,81 @@ class OpenAIIntegration(StrictSchemaModel):
     )
 
 
+class AssetGenerationGuardrails(StrictSchemaModel):
+    """Mandatory guardrails for synthetic asset generation."""
+
+    no_real_person_likeness: Literal[True] = Field(
+        description="Must be true: generated assets must not depict real-person likenesses."
+    )
+    no_copyrighted_brand_assets: Literal[True] = Field(
+        description=(
+            "Must be true: generated assets must not include copyrighted logos, characters, or identifiable IP."
+        )
+    )
+    no_pii: Literal[True] = Field(
+        description="Must be true: generated assets must not include personally identifiable information."
+    )
+    content_safety_notes: str = Field(
+        description="Additional prompt/content safety constraints, or 'none' when no extras are needed."
+    )
+
+
+class AssetGenerationAPIChoice(StrictSchemaModel):
+    """API/model choice by asset modality."""
+
+    asset_type: Literal["text", "image", "audio"] = Field(
+        description="Asset modality this API/model choice applies to."
+    )
+    openai_api_surface: Literal["responses", "realtime", "agents"] = Field(
+        description="OpenAI API surface used to generate this asset type."
+    )
+    model: str = Field(
+        description=(
+            "Model identifier for this asset type. Prefer defaults (gpt-5.2 for responses/agents and "
+            "gpt-realtime for realtime) unless demo-specific requirements justify overrides."
+        )
+    )
+    why_this_choice: str = Field(
+        description="Short rationale tied to quality, cost, determinism, and demo requirements."
+    )
+
+
+class AssetGenerationPlan(StrictSchemaModel):
+    """Plan for generating required synthetic text/image/audio assets in repo."""
+
+    when_assets_are_required: str = Field(
+        description=(
+            "Explicit rule for DemoSpec.synthetic_demo_inputs.required_assets: if empty, no generation "
+            "is needed; if non-empty, generate assets and commit them to the repository."
+        )
+    )
+    api_and_model_by_asset_type: list[AssetGenerationAPIChoice] = Field(
+        min_length=1, description="Per-modality OpenAI API/model choices used for asset generation."
+    )
+    generation_commands_or_scripts: list[str] = Field(
+        min_length=1,
+        description="Concrete local commands/scripts for deterministic-ish synthetic asset generation.",
+    )
+    repo_storage_location: str = Field(
+        description="In-repo storage path for generated synthetic assets."
+    )
+    naming_convention: str = Field(
+        description="Stable naming convention that includes asset_id and synthetic status."
+    )
+    how_app_loads_and_references_assets: str = Field(
+        description="How runtime loads and references generated assets in seeded demo flows."
+    )
+    explicit_synthetic_labeling_in_app: str = Field(
+        description="How the app visibly labels generated assets as synthetic in relevant UI surfaces."
+    )
+    guardrails: AssetGenerationGuardrails = Field(
+        description="Mandatory content/safety guardrails for generation."
+    )
+    no_live_generation_on_startup: Literal[True] = Field(
+        description="Must be true: app startup must not depend on live asset generation calls."
+    )
+
+
 class PromptPack(StrictSchemaModel):
     """Prompt templates aligned to headline demo items."""
 
@@ -453,6 +528,13 @@ class TestingStrategy(StrictSchemaModel):
             "behavior, disabled explanation behavior, and loading-state behavior per control."
         )
     )
+    synthetic_assets_validation: str = Field(
+        description=(
+            "Required synthetic-asset validation plan covering expected repo-path existence, basic "
+            "file sanity checks (type/extension, non-zero size, configured size limits), and proof "
+            "that seeded startup flows run without live asset-generation network calls."
+        )
+    )
 
 
 class UIConstraints(StrictSchemaModel):
@@ -581,6 +663,12 @@ class CodeSpecArtifact(ArtifactBase):
     )
     synthetic_data_implementation: SyntheticDataImplementation = Field(
         description="Deterministic synthetic data setup used for first-run demo behavior."
+    )
+    asset_generation_plan: AssetGenerationPlan = Field(
+        description=(
+            "Required plan for generating needed synthetic assets via OpenAI APIs and committing "
+            "them to the repository."
+        )
     )
     consistency_trace: ConsistencyTrace = Field(
         description="Cross-phase mapping to keep headline capability identifiers consistent."

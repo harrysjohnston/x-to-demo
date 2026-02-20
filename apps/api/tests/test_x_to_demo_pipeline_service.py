@@ -318,6 +318,21 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                     "Objective: produce a concise structured intent",
                 ],
             },
+            "required_assets": [
+                {
+                    "asset_id": "summary_seed_brief_txt",
+                    "asset_type": "text",
+                    "purpose": "Provides a deterministic seeded brief for first-run demo output preview.",
+                    "where_used_in_headline_flows": [
+                        "intent_summarization",
+                        "step-generate",
+                    ],
+                    "expected_format": "plain text <= 1KB",
+                    "size_constraints": "< 32KB",
+                    "must_be_labeled_synthetic": True,
+                    "synthetic_label_text": "Synthetic demo text asset",
+                }
+            ],
         },
         "consistency_trace": {
             "phase1_headline_capability_refs": ["intent_summarization"],
@@ -407,8 +422,8 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "covers_requires_voice": True,
             "covers_requires_tool_loop": True,
             "models": {
-                "primary": "gpt-5.1",
-                "fallbacks": ["gpt-5-mini"],
+                "primary": "gpt-5.2",
+                "fallbacks": ["gpt-5.1", "gpt-5-mini"],
             },
             "response_handling": {
                 "structured_outputs": "Use strict schema-backed JSON output mode.",
@@ -468,6 +483,41 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "reset_and_rerun_control": "Reset button restores seed input and reruns flow.",
             "determinism_guidance": "Use fixed fixtures and deterministic response snapshots.",
         },
+        "asset_generation_plan": {
+            "when_assets_are_required": (
+                "If demo_spec.synthetic_demo_inputs.required_assets is empty, skip generation. "
+                "If non-empty, run generation commands and commit outputs under assets/synthetic/."
+            ),
+            "api_and_model_by_asset_type": [
+                {
+                    "asset_type": "text",
+                    "openai_api_surface": "responses",
+                    "model": "gpt-5.2",
+                    "why_this_choice": (
+                        "Default Responses model provides high-quality deterministic-ish text generation "
+                        "for seeded demo assets at low operational complexity."
+                    ),
+                }
+            ],
+            "generation_commands_or_scripts": [
+                "uv run python scripts/generate_synthetic_assets.py --asset-id summary_seed_brief_txt --type text --out assets/synthetic/"
+            ],
+            "repo_storage_location": "assets/synthetic/",
+            "naming_convention": "synthetic__{asset_id}__v1.{ext}",
+            "how_app_loads_and_references_assets": (
+                "Import or serve assets from assets/synthetic/ and map by asset_id in seeded flow config."
+            ),
+            "explicit_synthetic_labeling_in_app": (
+                "Render 'Synthetic demo text asset' badge adjacent to seeded content previews and upload chips."
+            ),
+            "guardrails": {
+                "no_real_person_likeness": True,
+                "no_copyrighted_brand_assets": True,
+                "no_pii": True,
+                "content_safety_notes": "none",
+            },
+            "no_live_generation_on_startup": True,
+        },
         "consistency_trace": {
             "phase2_headline_capability_refs": ["intent_summarization"],
             "headline_item_implementation": [
@@ -511,6 +561,11 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             ),
             "mocking_instructions": (
                 "Mock OpenAI calls with deterministic fixtures; keep snapshots stable for key rendered sections."
+            ),
+            "synthetic_assets_validation": (
+                "Add deterministic tests that assert required assets exist at assets/synthetic/, "
+                "have expected extension + non-zero size within limits, and verify startup seeded "
+                "flows run with network calls to asset generation disabled."
             ),
             "openai_test_tiers": {
                 "mocked": {

@@ -22,3 +22,4 @@ tests/test_uploads.py
 tests/test_users.py
 tests/test_x_to_demo.py
 tests/test_x_to_demo_pipeline_service.py
+tests/test_x_to_demo_prompts.py

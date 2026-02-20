@@ -34,6 +34,8 @@ def test_build_phase_prompts_includes_global_hard_rules() -> None:
         "No inert buttons: every interactive element must have defined behavior and automated test coverage."
         in developer_prompt
     )
+    assert "they must be synthetic, generated via appropriate OpenAI APIs" in developer_prompt
+    assert "Demo startup must not depend on live asset generation" in developer_prompt
     assert (
         "Do not add fields, wrappers, markdown, or prose outside schema fields." in developer_prompt
     )
@@ -55,6 +57,7 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
         "DemoSpec must include interaction_contracts covering every minimalist view"
         in developer_prompt
     )
+    assert "SyntheticDemoInputs must include required_assets" in developer_prompt
     assert "Interaction contracts must be complete" in developer_prompt
     assert "not a presenter script." in developer_prompt
     assert (
@@ -69,6 +72,7 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
         "Include interaction_contracts for each minimalist view: enumerate every control"
         in user_prompt
     )
+    assert "Populate synthetic_demo_inputs.required_assets" in user_prompt
     assert "Ensure screen_name matches DemoExperience.minimalist_views[*].name" in user_prompt
     assert "Provide consistency trace to phase-1 headline capability identifiers." in user_prompt
     assert "Keep tooling decision consistent with phase 1." in user_prompt
@@ -107,6 +111,11 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     assert "CodeSpec must include two-tier OpenAI tests" in developer_prompt
     assert "OpenAIIntegration must include request_validation" in developer_prompt
     assert "TestingStrategy must include openai_test_tiers" in developer_prompt
+    assert (
+        "CodeSpec must include asset_generation_plan mapping required asset modalities"
+        in developer_prompt
+    )
+    assert "TestingStrategy must include synthetic_assets_validation" in developer_prompt
     assert "Choose OpenAI API(s) and initial prompts aligned to headline items." in user_prompt
     assert "If any headline item is voice, include Realtime." in user_prompt
     assert (
@@ -118,6 +127,7 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Specify synthetic data implementation for deterministic first launch and reruns."
         in user_prompt
     )
+    assert "Include asset_generation_plan (API/model per modality" in user_prompt
     assert (
         "Include WalkthroughImplementation.state_machine_model with explicit states/transitions"
         in user_prompt
@@ -137,6 +147,7 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Include TestingStrategy.interaction_test_matrix mapping every control_id_ref"
         in user_prompt
     )
+    assert "Include testing_strategy.synthetic_assets_validation" in user_prompt
     assert "Include OpenAIIntegration.request_validation" in user_prompt
     assert "Include TestingStrategy.openai_test_tiers" in user_prompt
     assert "Set interaction_test_matrix.rule to include" in user_prompt
@@ -162,6 +173,7 @@ def test_code_spec_schema_requires_explicit_testing_strategy_fields() -> None:
     assert "verification_steps" in required
     assert "walkthrough_test_suite_requirements" in required
     assert "interaction_test_matrix" in required
+    assert "synthetic_assets_validation" in required
 
 
 def test_code_spec_schema_requires_walkthrough_state_machine_model() -> None:
@@ -213,6 +225,36 @@ def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> Non
     assert "openai_test_tiers" in set(testing_schema["required"])
     assert "walkthrough_test_suite_requirements" in set(testing_schema["required"])
     assert "interaction_test_matrix" in set(testing_schema["required"])
+    assert "synthetic_assets_validation" in set(testing_schema["required"])
+
+    asset_plan_name = normalized["properties"]["asset_generation_plan"]["$ref"].split("/")[-1]
+    asset_plan_schema = normalized["$defs"][asset_plan_name]
+    assert asset_plan_schema["additionalProperties"] is False
+    assert set(asset_plan_schema["required"]) == {
+        "api_and_model_by_asset_type",
+        "explicit_synthetic_labeling_in_app",
+        "generation_commands_or_scripts",
+        "guardrails",
+        "how_app_loads_and_references_assets",
+        "naming_convention",
+        "no_live_generation_on_startup",
+        "repo_storage_location",
+        "when_assets_are_required",
+    }
+    assert asset_plan_schema["properties"]["no_live_generation_on_startup"]["const"] is True
+
+    guardrails_name = asset_plan_schema["properties"]["guardrails"]["$ref"].split("/")[-1]
+    guardrails_schema = normalized["$defs"][guardrails_name]
+    assert guardrails_schema["additionalProperties"] is False
+    assert set(guardrails_schema["required"]) == {
+        "content_safety_notes",
+        "no_copyrighted_brand_assets",
+        "no_pii",
+        "no_real_person_likeness",
+    }
+    assert guardrails_schema["properties"]["no_real_person_likeness"]["const"] is True
+    assert guardrails_schema["properties"]["no_copyrighted_brand_assets"]["const"] is True
+    assert guardrails_schema["properties"]["no_pii"]["const"] is True
 
     openai_tiers_name = testing_schema["properties"]["openai_test_tiers"]["$ref"].split("/")[-1]
     openai_tiers_schema = normalized["$defs"][openai_tiers_name]
@@ -289,12 +331,33 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
         "observable_state_or_ui_change",
     }
 
+    synthetic_inputs_name = schema["properties"]["synthetic_demo_inputs"]["$ref"].split("/")[-1]
+    synthetic_inputs_schema = schema["$defs"][synthetic_inputs_name]
+    assert "required_assets" in set(synthetic_inputs_schema.get("required", []))
+
+    asset_name = synthetic_inputs_schema["properties"]["required_assets"]["items"]["$ref"].split(
+        "/"
+    )[-1]
+    required_asset_schema = schema["$defs"][asset_name]
+    assert set(required_asset_schema["required"]) == {
+        "asset_id",
+        "asset_type",
+        "expected_format",
+        "must_be_labeled_synthetic",
+        "purpose",
+        "size_constraints",
+        "synthetic_label_text",
+        "where_used_in_headline_flows",
+    }
+    assert required_asset_schema["properties"]["must_be_labeled_synthetic"]["const"] is True
+
 
 def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> None:
     schema = CodeSpecArtifact.model_json_schema()
     required = set(schema.get("required", []))
 
     assert "synthetic_data_implementation" in required
+    assert "asset_generation_plan" in required
     assert "consistency_trace" in required
     assert "tooling_plan" in required
 

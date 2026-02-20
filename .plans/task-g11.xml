@@ -1,0 +1,294 @@
+<coding_agent_prompt id="g11-multimodal-synthetic-assets-xml">
+  <meta>
+    <task_id>G11</task_id>
+    <task_name>Multimodal synthetic assets generation via OpenAI APIs (when assets are needed)</task_name>
+  </meta>
+
+  <repo_inspection>
+    <observed_files>
+      <file path="apps/api/app/x_to_demo/schemas/demo_spec.py">
+        <notes>
+          <note>SyntheticDemoInputs currently supports seed_dataset/default_first_run_inputs/expected_outputs, but has no required_assets inventory for text/image/audio assets.</note>
+          <note>ToolingPlanIfNeeded exists, but seeded assets are not explicitly modeled as in-repo synthetic assets with constraints.</note>
+        </notes>
+      </file>
+
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py">
+        <notes>
+          <note>CodeSpecArtifact includes synthetic_data_implementation and tooling_plan, but no asset_generation_plan that mandates OpenAI-generated synthetic assets saved in-repo.</note>
+          <note>TestingStrategy exists but does not explicitly require “assets exist + sanity checks + startup does not depend on live asset generation.”</note>
+        </notes>
+      </file>
+
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py">
+        <notes>
+          <note>Phase rules enforce synthetic seed data and deterministic reruns, but do not hard-require asset inventories (phase 2) or generation plans + validation (phase 3).</note>
+        </notes>
+      </file>
+    </observed_files>
+  </repo_inspection>
+
+  <objective>
+    <summary>
+      Modify spec-generation (schemas + prompts) so that when a demo needs example text/images/audio for synthetic inputs or seeded scenarios:
+      (1) DemoSpec explicitly lists required synthetic assets (type, purpose, where used, format/size constraints, labels),
+      (2) CodeSpec mandates generating those assets via OpenAI APIs (appropriate modality), committing them into the repo under a standard path,
+      (3) CodeSpec includes deterministic-ish generation commands/scripts and app loading/referencing details,
+      (4) Tests validate assets exist, pass basic sanity checks, and demo startup never depends on live asset generation.
+    </summary>
+  </objective>
+
+  <implementation_plan>
+    <step index="1" title="Schema: extend DemoSpec.synthetic_demo_inputs with required_assets (required)">
+      <file path="apps/api/app/x_to_demo/schemas/demo_spec.py" />
+      <changes>
+        <add_models>
+          <model name="RequiredSyntheticAsset" base="StrictSchemaModel">
+            <field name="asset_id" type="str" required="true">
+              <description>Stable identifier for the asset used for cross-phase references and test mapping.</description>
+            </field>
+            <field name="asset_type" type="Literal['text','image','audio']" required="true">
+              <description>Asset modality/type.</description>
+            </field>
+            <field name="purpose" type="str" required="true">
+              <description>Why the asset is needed (seeded scenario, example upload, UI preview, etc.).</description>
+            </field>
+            <field name="where_used_in_headline_flows" type="list[str]" required="true">
+              <description>
+                Which headline demo item(s)/step(s) use this asset (use stable refs/IDs already in the spec, or explicit text references).
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="expected_format" type="str" required="true">
+              <description>
+                Expected file/text format and constraints (e.g., "png 1024x1024", "wav 16kHz mono", "plain text <= 1KB").
+              </description>
+            </field>
+            <field name="size_constraints" type="str" required="true">
+              <description>Max size guidance suitable for a repo asset and fast demo load (e.g., "< 1MB").</description>
+            </field>
+            <field name="must_be_labeled_synthetic" type="Literal[True]" required="true">
+              <description>Must be true: asset is explicitly labeled synthetic.</description>
+            </field>
+            <field name="synthetic_label_text" type="str" required="true">
+              <description>Exact label text to associate with this asset (e.g., "Synthetic demo image").</description>
+            </field>
+          </model>
+        </add_models>
+
+        <modify_existing_model name="SyntheticDemoInputs">
+          <add_required_field name="required_assets" type="list[RequiredSyntheticAsset]">
+            <description>
+              Required inventory of synthetic assets needed to run the demo deterministically (text/images/audio).
+              If no additional assets are needed beyond embedded seed_dataset/expected_outputs, include an empty list.
+            </description>
+          </add_required_field>
+          <notes>
+            <note>Prefer an empty list rather than omitting the field (keep schema deterministic).</note>
+            <note>Assets must be explicitly labeled as synthetic via must_be_labeled_synthetic=true and synthetic_label_text.</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>SyntheticDemoInputs has required_assets and each asset includes type, purpose, usage mapping, format/size constraints, and explicit synthetic labeling.</criterion>
+        <criterion>Schema remains strict (extra="forbid").</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="2" title="Schema: require CodeSpec.asset_generation_plan (required)">
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py" />
+      <changes>
+        <add_models>
+          <model name="AssetGenerationGuardrails" base="StrictSchemaModel">
+            <field name="no_real_person_likeness" type="Literal[True]" required="true">
+              <description>Must be true: forbid generating real-person likenesses.</description>
+            </field>
+            <field name="no_copyrighted_brand_assets" type="Literal[True]" required="true">
+              <description>Must be true: forbid copyrighted brand logos/characters/identifiable IP.</description>
+            </field>
+            <field name="no_pii" type="Literal[True]" required="true">
+              <description>Must be true: forbid PII in generated text/audio/images.</description>
+            </field>
+            <field name="content_safety_notes" type="str" required="true">
+              <description>Any additional content safety notes or prompts constraints (or "none").</description>
+            </field>
+          </model>
+
+          <model name="AssetGenerationAPIChoice" base="StrictSchemaModel">
+            <field name="asset_type" type="Literal['text','image','audio']" required="true">
+              <description>Which modality this plan item applies to.</description>
+            </field>
+            <field name="openai_api_surface" type="Literal['responses','realtime','agents']" required="true">
+              <description>
+                API surface used for generation. (Examples: Responses for text; Realtime only if audio generation/streaming is required; Agents only if multi-step orchestration is required.)
+              </description>
+            </field>
+            <field name="model" type="str" required="true">
+              <description>Model identifier used for this asset generation.</description>
+            </field>
+            <field name="why_this_choice" type="str" required="true">
+              <description>Short justification tied to determinism/cost/quality and demo needs.</description>
+            </field>
+          </model>
+
+          <model name="AssetGenerationPlan" base="StrictSchemaModel">
+            <field name="when_assets_are_required" type="str" required="true">
+              <description>
+                Explicit rule for interpreting DemoSpec.synthetic_demo_inputs.required_assets:
+                "If empty, no generation needed; if non-empty, generation steps below must be followed and assets must be committed."
+              </description>
+            </field>
+            <field name="api_and_model_by_asset_type" type="list[AssetGenerationAPIChoice]" required="true">
+              <description>Per-modality OpenAI API/model selection plan for asset generation.</description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="generation_commands_or_scripts" type="list[str]" required="true">
+              <description>
+                Concrete scripts or one-off commands to generate assets (prefer deterministic params where possible).
+                Must include how to run locally.
+              </description>
+              <constraint>min_length=1</constraint>
+            </field>
+            <field name="repo_storage_location" type="str" required="true">
+              <description>Where assets are stored in-repo (e.g., "assets/synthetic/").</description>
+            </field>
+            <field name="naming_convention" type="str" required="true">
+              <description>Stable naming convention that includes asset_id and indicates synthetic status.</description>
+            </field>
+            <field name="how_app_loads_and_references_assets" type="str" required="true">
+              <description>
+                How the demo loads these assets at runtime (static import/served files) and how UI references them in seeded flows.
+              </description>
+            </field>
+            <field name="explicit_synthetic_labeling_in_app" type="str" required="true">
+              <description>
+                How the UI labels these assets as synthetic (where labels appear, e.g., captions, tooltips, upload previews).
+              </description>
+            </field>
+            <field name="guardrails" type="AssetGenerationGuardrails" required="true">
+              <description>Mandatory content guardrails for asset generation.</description>
+            </field>
+            <field name="no_live_generation_on_startup" type="Literal[True]" required="true">
+              <description>Must be true: demo startup must not depend on live asset generation calls.</description>
+            </field>
+          </model>
+        </add_models>
+
+        <modify_existing_model name="CodeSpecArtifact">
+          <add_required_field name="asset_generation_plan" type="AssetGenerationPlan">
+            <description>
+              Required plan for generating any needed synthetic assets via OpenAI APIs and committing them into the repo.
+              Must be compatible with the DemoSpec.required_assets inventory.
+            </description>
+          </add_required_field>
+          <notes>
+            <note>Keep strict schema handling (extra="forbid").</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>CodeSpecArtifact includes required asset_generation_plan with per-modality API/model choices, generation scripts/commands, repo storage + naming, load/reference plan, explicit synthetic labeling, and guardrails.</criterion>
+        <criterion>asset_generation_plan.no_live_generation_on_startup is enforced as Literal[True].</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="3" title="Schema: require testing validation for assets + startup independence">
+      <file path="apps/api/app/x_to_demo/schemas/code_spec.py" />
+      <changes>
+        <modify_existing_model name="TestingStrategy">
+          <add_required_field name="synthetic_assets_validation" type="str">
+            <description>
+              Required test/verification requirements for synthetic assets:
+              - assets exist at expected repo paths
+              - basic sanity checks (file type/extension, non-zero size, size limits)
+              - demo startup does not depend on live asset generation (no network calls required to render seeded flows)
+              Provide concrete test target locations and how to run.
+            </description>
+          </add_required_field>
+          <notes>
+            <note>This complements existing verification_steps; ensure those steps include an assets validation command or test.</note>
+          </notes>
+        </modify_existing_model>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>TestingStrategy includes synthetic_assets_validation with explicit checks: existence, type/size sanity, and startup independence from live generation.</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="4" title="Prompts: enforce asset inventory (phase 2) and generation plan + tests (phase 3)">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <update_global_hard_rules>
+          <add_rule>
+            If the demo needs example text/images/audio assets, they must be synthetic and generated via OpenAI APIs (appropriate modality), saved in-repo, and explicitly labeled synthetic in the UI. Do not source ad-hoc internet content.
+          </add_rule>
+          <add_rule>
+            Demo startup must not depend on live asset generation; assets must already exist in the repo and be validated by tests.
+          </add_rule>
+        </update_global_hard_rules>
+
+        <update_phase_rules phase="demo_spec">
+          <add_rule>
+            SyntheticDemoInputs must include required_assets listing any text/image/audio assets needed for seeded scenarios or example uploads, including purpose, where used in headline flows, format/size constraints, and explicit synthetic labeling.
+            If none are needed, required_assets must be an empty list.
+          </add_rule>
+        </update_phase_rules>
+
+        <update_phase_priority_checklist phase="demo_spec">
+          <add_item>Populate synthetic_demo_inputs.required_assets (or empty list) with asset_type, purpose, where-used mapping, format/size constraints, and explicit synthetic labeling.</add_item>
+        </update_phase_priority_checklist>
+
+        <update_phase_rules phase="code_spec">
+          <add_rule>
+            CodeSpec must include asset_generation_plan that maps each required asset modality to OpenAI API/model choices, provides generation scripts/commands, specifies repo storage (e.g., assets/synthetic/), naming conventions, and how the app loads/labels them as synthetic.
+          </add_rule>
+          <add_rule>
+            TestingStrategy must include synthetic_assets_validation verifying assets exist, pass basic sanity checks, and that demo startup does not require live asset generation.
+          </add_rule>
+        </update_phase_rules>
+
+        <update_phase_priority_checklist phase="code_spec">
+          <add_item>Include asset_generation_plan (API/model per modality, generation scripts/commands, repo storage + naming, app load/reference, UI synthetic labels, guardrails, no_live_generation_on_startup=true).</add_item>
+          <add_item>Include testing_strategy.synthetic_assets_validation (existence + file sanity + startup independence).</add_item>
+        </update_phase_priority_checklist>
+
+        <notes>
+          <note>Preserve JSON-only output and strict schema adherence.</note>
+          <note>Do not introduce new tools unless required; this task is about generating and committing assets, not runtime tool loops.</note>
+        </notes>
+      </changes>
+
+      <acceptance_criteria>
+        <criterion>Phase-2 output reliably includes required_assets inventory (or empty list), preventing missing asset requirements later.</criterion>
+        <criterion>Phase-3 output reliably includes asset_generation_plan + synthetic_assets_validation with concrete commands and checks.</criterion>
+      </acceptance_criteria>
+    </step>
+
+    <step index="5" title="Structured-output strictness sanity check">
+      <file path="apps/api/app/x_to_demo/pipeline/prompts.py" />
+      <changes>
+        <verify>
+          <item>
+            After adding nested objects to demo_spec and code_spec schemas, confirm openai_compatible_schema()
+            still produces strict-compatible schemas (additionalProperties:false, required includes all properties, $ref-only nodes).
+          </item>
+        </verify>
+      </changes>
+      <acceptance_criteria>
+        <criterion>No regressions in strict structured output compatibility.</criterion>
+      </acceptance_criteria>
+    </step>
+  </implementation_plan>
+
+  <definition_of_done>
+    <checks>
+      <check>Every generated DemoSpec includes synthetic_demo_inputs.required_assets (or empty list) with modality, usage mapping, format/size constraints, and explicit synthetic labeling.</check>
+      <check>Every generated CodeSpec includes asset_generation_plan that mandates OpenAI-generated synthetic assets committed in-repo, with generation commands/scripts and app load/reference plan.</check>
+      <check>Every generated CodeSpec includes testing_strategy.synthetic_assets_validation ensuring assets exist, are sane, and demo startup does not depend on live asset generation.</check>
+      <check>Prompt rules/checklists enforce the above so downstream coding agents implement assets deterministically and safely.</check>
+    </checks>
+  </definition_of_done>
+</coding_agent_prompt>

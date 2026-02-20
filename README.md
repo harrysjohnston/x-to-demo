@@ -137,7 +137,10 @@ uv run pytest -q -c apps/api/pyproject.toml apps/api/tests
 - Pipeline is synchronous per request.
 - Output is designed for demo-build handoff, not production architecture.
 - Phase-2 `DemoSpec` artifacts now require `interaction_contracts` that enumerate every per-screen interactive control with behavior, observable effects, enable/disable rules, and loading-state expectations.
+- Phase-2 `DemoSpec` artifacts now require `synthetic_demo_inputs.required_assets` (empty list allowed) to inventory every required synthetic text/image/audio asset with purpose, usage mapping, format/size constraints, and explicit synthetic labels.
+- Phase-3 `CodeSpec` artifacts now require `asset_generation_plan` describing per-modality OpenAI API/model choices, local generation scripts/commands, repo storage/naming, app loading/labeling behavior, mandatory guardrails, and `no_live_generation_on_startup=true`.
 - Phase-3 `CodeSpec` artifacts now require `testing_strategy.interaction_test_matrix` that maps each control id to enabled/disabled/loading assertions under the no-inert-controls rule.
+- Phase-3 `CodeSpec` artifacts now require `testing_strategy.synthetic_assets_validation` proving synthetic assets exist, pass basic file sanity checks, and that seeded startup flows do not depend on live generation calls.
 - Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
 - Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
 - Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.

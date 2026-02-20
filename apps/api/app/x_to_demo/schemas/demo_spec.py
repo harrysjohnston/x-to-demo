@@ -298,6 +298,40 @@ class FirstRunInputSet(StrictSchemaModel):
     )
 
 
+class RequiredSyntheticAsset(StrictSchemaModel):
+    """Required synthetic text/image/audio asset inventory entry for deterministic demos."""
+
+    asset_id: str = Field(
+        description=(
+            "Stable identifier for this asset used for cross-phase references and test mapping."
+        )
+    )
+    asset_type: Literal["text", "image", "audio"] = Field(description="Asset modality/type.")
+    purpose: str = Field(
+        description="Why this asset is needed (seeded scenario, example upload, UI preview, and similar)."
+    )
+    where_used_in_headline_flows: list[str] = Field(
+        min_length=1,
+        description=(
+            "Headline demo item or step references that use this asset, using stable IDs or explicit references."
+        ),
+    )
+    expected_format: str = Field(
+        description=(
+            "Expected file/text format and constraints (for example png 1024x1024, wav 16kHz mono, plain text <= 1KB)."
+        )
+    )
+    size_constraints: str = Field(
+        description="Max size guidance suitable for in-repo demo assets and fast load times."
+    )
+    must_be_labeled_synthetic: Literal[True] = Field(
+        description="Must be true: this asset is explicitly labeled synthetic."
+    )
+    synthetic_label_text: str = Field(
+        description="Exact synthetic label text shown for this asset in the demo."
+    )
+
+
 class SyntheticDemoInputs(StrictSchemaModel):
     """Synthetic-first dataset and first-run expectations for deterministic demos."""
 
@@ -315,6 +349,12 @@ class SyntheticDemoInputs(StrictSchemaModel):
     )
     expected_outputs: TextOrEmbeddedData = Field(
         description="Expected first-run outputs as concise text or structured object."
+    )
+    required_assets: list[RequiredSyntheticAsset] = Field(
+        description=(
+            "Required inventory of synthetic text/image/audio assets needed for deterministic demo runs. "
+            "Use an empty list when no extra assets are needed."
+        )
     )
 
 
