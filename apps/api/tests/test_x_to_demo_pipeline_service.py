@@ -401,6 +401,11 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "highlight_mechanism": "Step-target CSS highlight overlays tied to stable element ids.",
             "step_definition_data_model": "Static list of step objects keyed by walkthrough step id.",
             "auto_start_and_retrigger": "Auto-start on first load and retrigger via help action.",
+            "state_machine_model": (
+                "States: idle, auto_start_pending, active_step, cancelled, completed. "
+                "Transitions: auto_start, next, back, cancel, finish, retrigger with guards for "
+                "valid step index range; invalid transitions no-op with telemetry and never block recovery."
+            ),
         },
         "synthetic_data_implementation": {
             "data_location": "Local fixture module under app data folder.",
@@ -458,6 +463,11 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "Confirm all tests pass with no flaky reruns.",
                 "Verify targeted tests cover AI parsing, walkthrough, and state transitions.",
             ],
+            "walkthrough_test_suite_requirements": (
+                "Run deterministic walkthrough tests that auto-start on launch, step next/back, "
+                "cancel anytime, finish, retrigger, enforce in-range step indexes, resolve "
+                "intended highlight targets, and verify targets are present/visible (enabled when applicable) at step display time."
+            ),
         },
         "ui_constraints": {
             "minimalist_layout_rules": [

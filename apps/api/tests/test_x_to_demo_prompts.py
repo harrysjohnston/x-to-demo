@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.x_to_demo.pipeline.models import PIPELINE_PHASES, PipelineRunInput
-from app.x_to_demo.pipeline.prompts import build_phase_prompts
+from app.x_to_demo.pipeline.prompts import build_phase_prompts, openai_compatible_schema
 from app.x_to_demo.schemas.code_spec import CodeSpecArtifact
 from app.x_to_demo.schemas.demo_spec import DemoSpecArtifact
 from app.x_to_demo.schemas.feature_spec import FeatureSpecArtifact
@@ -78,8 +78,16 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     )
     assert "Every demo must load OPENAI_API_KEY from environment" in developer_prompt
     assert "CodeSpec must include explicit README setup instructions" in developer_prompt
+    assert "Walkthrough must be reliable: never get stuck" in developer_prompt
     assert (
         "Specify runtime configuration for environment-based OPENAI_API_KEY loading"
+        in developer_prompt
+    )
+    assert (
+        "WalkthroughImplementation must include an explicit state machine model" in developer_prompt
+    )
+    assert (
+        "TestingStrategy must include a dedicated deterministic walkthrough test suite"
         in developer_prompt
     )
     assert "Include README requirements with exact setup steps" in developer_prompt
@@ -94,6 +102,10 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Specify synthetic data implementation for deterministic first launch and reruns."
         in user_prompt
     )
+    assert (
+        "Include WalkthroughImplementation.state_machine_model with explicit states/transitions"
+        in user_prompt
+    )
     assert "Include runtime_configuration requiring OPENAI_API_KEY via environment" in user_prompt
     assert "Include readme_requirements with explicit env-file setup" in user_prompt
     assert (
@@ -102,6 +114,10 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     )
     assert (
         "Require a testing strategy with module-by-module plan, deterministic mocks" in user_prompt
+    )
+    assert (
+        "Include TestingStrategy.walkthrough_test_suite_requirements covering deterministic walkthrough step-through"
+        in user_prompt
     )
     assert (
         "Do not use vague test language; provide concrete targets, mocks, and verification steps."
@@ -122,6 +138,39 @@ def test_code_spec_schema_requires_explicit_testing_strategy_fields() -> None:
     assert "acceptance_tests_scope_rules" in required
     assert "mocking_instructions" in required
     assert "verification_steps" in required
+    assert "walkthrough_test_suite_requirements" in required
+
+
+def test_code_spec_schema_requires_walkthrough_state_machine_model() -> None:
+    schema = CodeSpecArtifact.model_json_schema()
+    walkthrough_ref = schema["properties"]["walkthrough_implementation"]["$ref"]
+    walkthrough_name = walkthrough_ref.split("/")[-1]
+    walkthrough_schema = schema["$defs"][walkthrough_name]
+    required = set(walkthrough_schema.get("required", []))
+
+    assert "highlight_mechanism" in required
+    assert "step_definition_data_model" in required
+    assert "auto_start_and_retrigger" in required
+    assert "state_machine_model" in required
+
+
+def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> None:
+    normalized = openai_compatible_schema(CodeSpecArtifact.model_json_schema())
+    walkthrough_name = normalized["properties"]["walkthrough_implementation"]["$ref"].split("/")[-1]
+    walkthrough_schema = normalized["$defs"][walkthrough_name]
+
+    assert walkthrough_schema["additionalProperties"] is False
+    assert set(walkthrough_schema["required"]) == {
+        "highlight_mechanism",
+        "step_definition_data_model",
+        "auto_start_and_retrigger",
+        "state_machine_model",
+    }
+
+    testing_name = normalized["properties"]["testing_strategy"]["$ref"].split("/")[-1]
+    testing_schema = normalized["$defs"][testing_name]
+    assert testing_schema["additionalProperties"] is False
+    assert "walkthrough_test_suite_requirements" in set(testing_schema["required"])
 
 
 def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:

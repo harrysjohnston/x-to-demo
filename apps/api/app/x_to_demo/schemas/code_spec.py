@@ -225,6 +225,13 @@ class WalkthroughImplementation(StrictSchemaModel):
     auto_start_and_retrigger: str = Field(
         description="How walkthrough auto-start and retrigger behavior is implemented."
     )
+    state_machine_model: str = Field(
+        description=(
+            "Explicit walkthrough state machine: states, allowed transitions, guards, and "
+            "transition effects. Must cover auto-start, next, back, cancel, finish, and "
+            "retrigger behavior, including invalid transition handling and safe step-index bounds."
+        )
+    )
 
 
 class TestingStrategy(StrictSchemaModel):
@@ -283,6 +290,14 @@ class TestingStrategy(StrictSchemaModel):
             "Verifiable checklist including test commands, expected pass condition, and qualitative "
             "minimum test expectations."
         ),
+    )
+    walkthrough_test_suite_requirements: str = Field(
+        description=(
+            "Dedicated deterministic walkthrough suite requirements: auto-start on launch; next/back; "
+            "cancel at any time; finish; retrigger; safe step-index bounds; highlight target "
+            "resolution; and per-step validation that intended UI components are present/visible "
+            "(and enabled when applicable) when shown."
+        )
     )
 
 
