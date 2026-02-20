@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .common import ArtifactBase
 
@@ -286,15 +286,34 @@ class EmbeddedDataObject(StrictSchemaModel):
 TextOrEmbeddedData = str | EmbeddedDataObject
 
 
+class PresetInputSet(StrictSchemaModel):
+    """Global synthetic preset that can populate runtime inputs."""
+
+    preset_id: str = Field(description="Stable preset identifier.")
+    label: str = Field(description="User-facing preset label.")
+    ordered_inputs: list[str] = Field(
+        min_length=1,
+        description="Deterministic ordered runtime inputs populated by this preset.",
+    )
+    where_used_in_headline_flows: list[str] = Field(
+        default_factory=list,
+        description="Capability refs or walkthrough step ids where this preset is used.",
+    )
+    expected_outputs: TextOrEmbeddedData = Field(
+        description="Expected output if the user explicitly runs this preset."
+    )
+    notes: str = Field(description="Additional preset notes, or 'none'.")
+
+
 class FirstRunInputSet(StrictSchemaModel):
-    """Deterministic first-run inputs for immediate demo execution."""
+    """Legacy first-run input contract retained for markdown compatibility helpers."""
 
     ordered_inputs: list[str] = Field(
         min_length=1,
-        description="Exact ordered inputs applied on first launch.",
+        description="Legacy ordered inputs migrated into presets.",
     )
     trigger_action: str = Field(
-        description="Action that triggers first-run execution with the seeded inputs."
+        description="Legacy trigger text migrated to explicit preset execution behavior."
     )
 
 
@@ -333,13 +352,40 @@ class RequiredSyntheticAsset(StrictSchemaModel):
 
 
 class SyntheticDemoInputs(StrictSchemaModel):
-    """Synthetic-first dataset and first-run expectations for deterministic demos."""
+    """Synthetic-first dataset and selectable presets for deterministic demos."""
 
     seed_dataset: TextOrEmbeddedData = Field(
         description="Small safe seed dataset (embedded text or structured object)."
     )
-    default_first_run_inputs: FirstRunInputSet = Field(
-        description="Exact first-run inputs used to exercise headline capabilities."
+    input_presets: list[PresetInputSet] = Field(
+        default_factory=lambda: [
+            PresetInputSet(
+                preset_id="default-preset",
+                label="Default preset",
+                ordered_inputs=["Synthetic preset input"],
+                where_used_in_headline_flows=[],
+                expected_outputs="Expected output after explicit run action.",
+                notes="none",
+            )
+        ],
+        min_length=1,
+        description="Global selectable presets used to populate runtime inputs.",
+    )
+    default_selected_preset_id: str = Field(
+        default="default-preset",
+        description="Preset id that should be selected by default in the UI.",
+    )
+    preset_application_behavior: str = Field(
+        default=(
+            "Applying a preset populates runtime input fields only; it does not execute the flow."
+        ),
+        description="Must state that applying a preset populates UI only and does not execute.",
+    )
+    preset_execution_behavior: str = Field(
+        default=(
+            "Preset execution requires explicit user action (Run/Submit) after inputs are populated."
+        ),
+        description="Must state that running a preset requires explicit user action.",
     )
     why_this_data: str = Field(
         description="How the synthetic data covers the one-to-three headline demo items."
@@ -356,6 +402,76 @@ class SyntheticDemoInputs(StrictSchemaModel):
             "Use an empty list when no extra assets are needed."
         )
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_default_first_run_inputs(cls, value: object) -> object:
+        """Migrate legacy default_first_run_inputs into the new preset-based fields."""
+        if not isinstance(value, dict):
+            return value
+
+        data = dict(value)
+        legacy = data.pop("default_first_run_inputs", None)
+        if isinstance(legacy, dict) and "input_presets" not in data:
+            ordered_inputs = legacy.get("ordered_inputs")
+            if not isinstance(ordered_inputs, list) or not ordered_inputs:
+                ordered_inputs = ["Legacy preset input (update required)."]
+
+            preset_id = "legacy-default-first-run"
+            data["input_presets"] = [
+                {
+                    "preset_id": preset_id,
+                    "label": "Legacy default preset",
+                    "ordered_inputs": ordered_inputs,
+                    "where_used_in_headline_flows": [],
+                    "expected_outputs": data.get(
+                        "expected_outputs",
+                        "Expected output after explicit run action.",
+                    ),
+                    "notes": "Migrated from legacy default_first_run_inputs.",
+                }
+            ]
+            data.setdefault("default_selected_preset_id", preset_id)
+
+            trigger_action = legacy.get("trigger_action")
+            if isinstance(trigger_action, str) and trigger_action.strip():
+                data.setdefault(
+                    "preset_execution_behavior",
+                    (
+                        "Execution requires explicit user action (Run/Submit). "
+                        f"Legacy trigger note: {trigger_action.strip()}"
+                    ),
+                )
+            else:
+                data.setdefault(
+                    "preset_execution_behavior",
+                    "Execution requires explicit user action (Run/Submit) after applying a preset.",
+                )
+
+            data.setdefault(
+                "preset_application_behavior",
+                "Applying a preset populates runtime input fields only; it does not execute.",
+            )
+
+        if "default_selected_preset_id" not in data:
+            presets = data.get("input_presets")
+            if isinstance(presets, list) and presets:
+                first = presets[0]
+                if isinstance(first, dict):
+                    preset_id = first.get("preset_id")
+                    if isinstance(preset_id, str) and preset_id.strip():
+                        data["default_selected_preset_id"] = preset_id
+
+        return data
+
+    @property
+    def default_first_run_inputs(self) -> FirstRunInputSet:
+        """Compatibility projection for callers that still render legacy first-run sections."""
+        first_preset = self.input_presets[0]
+        return FirstRunInputSet(
+            ordered_inputs=first_preset.ordered_inputs,
+            trigger_action=self.preset_execution_behavior,
+        )
 
 
 class ConsistencyTrace(StrictSchemaModel):
@@ -402,6 +518,59 @@ class InteractionRequirements(StrictSchemaModel):
     )
 
 
+class RuntimeInputAndGuardrails(StrictSchemaModel):
+    """Demo-specific runtime input contract and server-side guardrails behavior."""
+
+    accepts_runtime_inputs: Literal[True] = Field(
+        default=True, description="Must be true: demo accepts runtime inputs from the UI."
+    )
+    supported_input_modalities: list[str] = Field(
+        default_factory=lambda: ["text"],
+        description="Demo-specific runtime input modalities accepted by the UI/API.",
+    )
+    input_capture_summary: str = Field(
+        default="Runtime inputs are captured from visible UI controls in the demo views.",
+        description="What runtime inputs the UI accepts and where.",
+    )
+    guardrails_pipeline_summary: list[str] = Field(
+        default_factory=lambda: [
+            "Deterministic type/format/size checks",
+            "Relevance model call with structured output verdict",
+            "Safety model call with structured output verdict",
+        ],
+        description="Ordered guardrail pipeline summary including type, relevance, and safety.",
+    )
+    relevance_check_summary: str = Field(
+        default="Server performs a relevance model call that returns a structured relevance verdict.",
+        description="Summary of the relevance model-call guardrail.",
+    )
+    safety_check_summary: str = Field(
+        default="Server performs a safety model call that returns a structured safety verdict.",
+        description="Summary of the safety model-call guardrail.",
+    )
+    user_visible_outcomes_on_reject: list[str] = Field(
+        default_factory=lambda: [
+            "Show an unsupported-input message in the input panel.",
+            "Show a safety/relevance rejection message near the run action.",
+        ],
+        description="User-visible reject outcomes and where messages appear.",
+    )
+    cancel_flow_behavior: str = Field(
+        default=(
+            "On reject, cancel before the main model call, preserve current UI state, and allow "
+            "user edits/retry."
+        ),
+        description=(
+            "Must explicitly state no main model call occurs on reject; UI state is preserved and "
+            "edit/try-again remains available."
+        ),
+    )
+    presets_go_through_same_guardrails: Literal[True] = Field(
+        default=True,
+        description="Must be true: preset-populated inputs use the same guardrails pipeline.",
+    )
+
+
 class DemoSpecArtifact(ArtifactBase):
     """Structured phase-2 artifact."""
 
@@ -438,8 +607,18 @@ class DemoSpecArtifact(ArtifactBase):
     interactive_walkthrough: InteractiveWalkthrough = Field(
         description="In-app interactive walkthrough requirements."
     )
+    runtime_input_and_guardrails: RuntimeInputAndGuardrails = Field(
+        default_factory=RuntimeInputAndGuardrails,
+        description=(
+            "Demo-specific runtime input contract and server-side guardrails behavior, including "
+            "reject outcomes and cancellation semantics."
+        ),
+    )
     synthetic_demo_inputs: SyntheticDemoInputs = Field(
-        description="Synthetic-first data package that makes the demo runnable on first launch."
+        description=(
+            "Synthetic-first data package with global selectable presets that populate runtime inputs "
+            "without auto-running."
+        )
     )
     consistency_trace: ConsistencyTrace = Field(
         description="Cross-phase consistency commitments for stable headline identifiers."

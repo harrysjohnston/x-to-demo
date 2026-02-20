@@ -164,7 +164,7 @@ Or run individual jobs:
 - Phase-3 `CodeSpec` artifacts now require `testing_strategy.synthetic_assets_validation` proving synthetic assets exist, pass basic file sanity checks, and that seeded startup flows do not depend on live generation calls.
 - Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
 - Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
-- Artifact schema version is now `0.2`; pre-`0.2` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
+- Artifact schema version is now `0.3`; pre-`0.3` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
 
 ## Related Docs
 
