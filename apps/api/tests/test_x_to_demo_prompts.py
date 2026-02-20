@@ -36,6 +36,10 @@ def test_build_phase_prompts_includes_global_hard_rules() -> None:
     )
     assert "they must be synthetic, generated via appropriate OpenAI APIs" in developer_prompt
     assert "Demo startup must not depend on live asset generation" in developer_prompt
+    assert "Synthetic demo inputs are global selectable presets" in developer_prompt
+    assert "must pass server-side guardrails before any main AI call" in developer_prompt
+    assert "Guardrails pipeline order is mandatory" in developer_prompt
+    assert "Keep specs demo-specific" in developer_prompt
     assert (
         "Do not add fields, wrappers, markdown, or prose outside schema fields." in developer_prompt
     )
@@ -59,17 +63,30 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
     )
     assert "SyntheticDemoInputs must include required_assets" in developer_prompt
     assert "Interaction contracts must be complete" in developer_prompt
+    assert "runtime_input_and_guardrails" in developer_prompt
+    assert "Runtime guardrails must apply identically" in developer_prompt
     assert "not a presenter script." in developer_prompt
     assert (
         "Specify interactive walkthrough (auto-start on launch, retrigger path, cancellable controls)."
         in user_prompt
     )
     assert (
-        "Provide synthetic seed data, default first-run inputs, and expected first-run outputs."
+        "Define global synthetic presets with explicit selector/apply/run/reset UX" in user_prompt
+    )
+    assert (
+        "Include runtime_input_and_guardrails with server-side type/relevance/safety stages"
+        in user_prompt
+    )
+    assert (
+        "Ensure preset-applied inputs and manual runtime inputs pass through the same guardrails."
         in user_prompt
     )
     assert (
         "Include interaction_contracts for each minimalist view: enumerate every control"
+        in user_prompt
+    )
+    assert (
+        "Ensure interaction_contracts include preset selector, apply preset, run/submit, and reset/clear controls."
         in user_prompt
     )
     assert "Populate synthetic_demo_inputs.required_assets" in user_prompt
@@ -106,6 +123,13 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "TestingStrategy must include interaction_test_matrix where each DemoSpec control_id"
         in developer_prompt
     )
+    assert "server-side runtime guardrails plan with exactly two model calls" in developer_prompt
+    assert (
+        "structured-output contract strings for RelevanceVerdict and SafetyVerdict"
+        in developer_prompt
+    )
+    assert "CodeSpec must include agent_skills_to_apply" in developer_prompt
+    assert "TestingStrategy must include preset_inputs_integration_coverage" in developer_prompt
     assert "Validate every OpenAI request before sending" in developer_prompt
     assert "fail fast with a clear UI-visible error message" in developer_prompt
     assert "CodeSpec must include two-tier OpenAI tests" in developer_prompt
@@ -124,9 +148,18 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     assert "Otherwise default to Responses." in user_prompt
     assert "Map each headline item to selected API(s) and justify the mapping." in user_prompt
     assert (
-        "Specify synthetic data implementation for deterministic first launch and reruns."
+        "Include a server-side runtime guardrails plan with deterministic type checks plus exactly two model calls"
         in user_prompt
     )
+    assert (
+        "Define structured verdict contracts for relevance and safety guardrail calls"
+        in user_prompt
+    )
+    assert (
+        "Specify synthetic preset implementation where default selection/apply populates UI only and run requires explicit action."
+        in user_prompt
+    )
+    assert "Include agent_skills_to_apply with runtime-input-guardrails-server-side" in user_prompt
     assert "Include asset_generation_plan (API/model per modality" in user_prompt
     assert (
         "Include WalkthroughImplementation.state_machine_model with explicit states/transitions"
@@ -148,6 +181,7 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         in user_prompt
     )
     assert "Include testing_strategy.synthetic_assets_validation" in user_prompt
+    assert "Include testing_strategy.preset_inputs_integration_coverage" in user_prompt
     assert "Include OpenAIIntegration.request_validation" in user_prompt
     assert "Include TestingStrategy.openai_test_tiers" in user_prompt
     assert "Set interaction_test_matrix.rule to include" in user_prompt

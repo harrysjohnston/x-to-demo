@@ -53,7 +53,7 @@ PIPELINE_PHASES: tuple[PipelinePhaseDefinition, ...] = (
         output_model=DemoSpecArtifact,
         objective=(
             "Convert the feature spec into a concise demo specification that clarifies scope, "
-            "flow steps, and success signals."
+            "runtime input flow, guardrail UX behavior, and success signals."
         ),
     ),
     PipelinePhaseDefinition(
@@ -63,7 +63,7 @@ PIPELINE_PHASES: tuple[PipelinePhaseDefinition, ...] = (
         output_model=CodeSpecArtifact,
         objective=(
             "Produce an implementation-ready code spec from the demo spec with concrete stack, "
-            "component, state, and test details."
+            "component, server-side guardrails pipeline, preset coverage, state, and test details."
         ),
     ),
 )
