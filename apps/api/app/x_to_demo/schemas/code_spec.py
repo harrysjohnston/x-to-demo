@@ -276,83 +276,77 @@ class PromptPack(StrictSchemaModel):
 
 
 class RelevanceVerdict(StrictSchemaModel):
-    """Structured verdict returned by the runtime relevance guardrail call."""
+    """Structured-output verdict from relevance guardrail model call."""
 
-    is_relevant: bool = Field(description="Whether the runtime input is relevant to demo scope.")
-    reason: str = Field(description="Concise reason for logs/telemetry.")
-    user_message: str = Field(description="User-visible relevance outcome message.")
+    is_relevant: bool = Field(
+        description="Whether runtime input is relevant to supported demo scope."
+    )
+    reason: str = Field(description="Internal/logging reason for the relevance verdict.")
+    user_message: str = Field(description="User-facing relevance message shown on reject.")
 
 
 class SafetyVerdict(StrictSchemaModel):
-    """Structured verdict returned by the runtime safety guardrail call."""
+    """Structured-output verdict from safety guardrail model call."""
 
-    is_safe: bool = Field(description="Whether the runtime input is safe to process.")
-    reason: str = Field(description="Concise reason for logs/telemetry.")
-    user_message: str = Field(description="User-visible safety outcome message.")
+    is_safe: bool = Field(description="Whether runtime input passes safety policy.")
+    reason: str = Field(description="Internal/logging reason for the safety verdict.")
+    user_message: str = Field(description="User-facing safety message shown on reject.")
 
 
 class RuntimeGuardrailsPlan(StrictSchemaModel):
-    """Server-side runtime guardrail pipeline executed before the main AI moment."""
+    """Server-side runtime guardrails plan before main AI execution."""
 
     server_side_only: Literal[True] = Field(
         default=True,
-        description="Must be true: runtime guardrails run server-side only.",
+        description="Must be true: runtime guardrails execute server-side only.",
     )
     deterministic_type_checks: list[str] = Field(
         default_factory=lambda: [
-            "Validate input modality support.",
-            "Validate format/mime expectations.",
-            "Validate payload size limits.",
+            "Validate supported modality and mime/format before model calls.",
+            "Validate payload/file size constraints before processing.",
+            "Return unsupported verdict for unsupported modality/format.",
         ],
-        description=(
-            "Deterministic type/format/size checks that can produce unsupported-input verdicts "
-            "without model calls."
-        ),
+        description="Deterministic type/format/size checks run before relevance/safety model calls.",
     )
     relevance_model_call: str = Field(
-        default="Responses API model call for relevance verdict generation.",
-        description="Demo-specific relevance model call configuration.",
+        default="Use configured default model for relevance structured-output call.",
+        description="Demo-specific relevance model call (model id or selection rule).",
     )
     relevance_prompt_contract: str = Field(
         default=(
-            "Pass supported modalities and demo scope context; require JSON-only structured output."
+            "Pass demo scope context, supported modalities, and runtime input summary; require JSON-only output."
         ),
-        description="Prompt contract for the relevance guardrail model call.",
+        description="Prompt contract for relevance model call.",
     )
     relevance_output_schema: str = Field(
-        default="RelevanceVerdict {is_relevant: bool, reason: str, user_message: str}",
-        description="Structured output schema contract for relevance verdicts.",
+        default="RelevanceVerdict { is_relevant: bool, reason: str, user_message: str }",
+        description="Output schema contract for relevance verdict.",
     )
     safety_model_call: str = Field(
-        default="Responses API model call for safety verdict generation.",
-        description="Demo-specific safety model call configuration.",
+        default="Use configured default model for safety structured-output call.",
+        description="Demo-specific safety model call (model id or selection rule).",
     )
     safety_prompt_contract: str = Field(
         default=(
-            "Pass the normalized runtime input and policy context; require JSON-only structured output."
+            "Pass runtime input summary and policy context; require JSON-only output with safety verdict."
         ),
-        description="Prompt contract for the safety guardrail model call.",
+        description="Prompt contract for safety model call.",
     )
     safety_output_schema: str = Field(
-        default="SafetyVerdict {is_safe: bool, reason: str, user_message: str}",
-        description="Structured output schema contract for safety verdicts.",
+        default="SafetyVerdict { is_safe: bool, reason: str, user_message: str }",
+        description="Output schema contract for safety verdict.",
     )
     verdict_handling: str = Field(
         default=(
-            "Unsupported type -> return unsupported verdict/message and stop; relevance reject -> "
-            "return unsupported verdict/message and stop; safety reject -> return blocked verdict/"
-            "message and stop; allow -> continue to main model call."
+            "unsupported -> show not-supported message and stop; block -> show safety message and stop; allow -> continue."
         ),
-        description="Mapping of unsupported/block/allow verdicts to flow outcomes.",
+        description="Mapping of unsupported/block/allow outcomes to flow behavior.",
     )
     logging_policy: str = Field(
         default=(
-            "Log request id, verdict decisions, schema parse outcome, and timings only; never persist "
-            "raw prompts, raw responses, or sensitive user content."
+            "Log request ids, verdicts, timings, and schema-parse outcomes only; never persist raw runtime content."
         ),
-        description=(
-            "Logging policy aligned with request_validation to avoid raw content persistence."
-        ),
+        description="Guardrails logging policy aligned with request validation no-raw-content constraints.",
     )
 
 
@@ -370,8 +364,7 @@ class AISeamGuardrails(StrictSchemaModel):
     runtime_guardrails_plan: RuntimeGuardrailsPlan = Field(
         default_factory=RuntimeGuardrailsPlan,
         description=(
-            "Server-side runtime guardrails plan with deterministic checks plus structured-output "
-            "relevance and safety model calls."
+            "Explicit server-side runtime guardrails plan with deterministic checks, relevance call, and safety call."
         ),
     )
 
@@ -632,12 +625,11 @@ class TestingStrategy(StrictSchemaModel):
     )
     preset_inputs_integration_coverage: str = Field(
         default=(
-            "Integration tests iterate every preset, apply it, run server-side guardrails, and "
-            "confirm it reaches the main flow in the mocked tier. Optional live tier runs a minimal "
-            "preset subset when explicitly opted in."
+            "Integration tests iterate every preset, apply preset values, execute guardrails, and "
+            "verify the flow can reach mocked main AI execution."
         ),
         description=(
-            "Preset integration coverage contract across mocked default and optional live tiers."
+            "Preset integration coverage contract that is explicit, deterministic, and implementable."
         ),
     )
 
@@ -667,11 +659,17 @@ class SyntheticDataImplementation(StrictSchemaModel):
     load_on_startup: str = Field(
         description="How synthetic data is loaded deterministically on startup."
     )
-    auto_populate_first_run: str = Field(
+    auto_apply_default_preset_on_load: str = Field(
+        default="Select and apply the default preset to UI inputs only; do not execute automatically.",
         description=(
-            "How the default preset is selected and applied (populate UI only). "
-            "Execution requires explicit run action."
-        )
+            "How the default preset is selected and applied on load (populate only; execution requires explicit run action)."
+        ),
+    )
+    auto_populate_first_run: str | None = Field(
+        default=None,
+        description=(
+            "Deprecated legacy field retained for compatibility with older artifacts that used auto-run phrasing."
+        ),
     )
     reset_and_rerun_control: str = Field(
         description="How users reset to seed data and rerun identical demo behavior."
@@ -760,7 +758,7 @@ class CodeSpecArtifact(ArtifactBase):
         default_factory=lambda: list(REQUIRED_AGENT_SKILLS_TO_APPLY),
         min_length=1,
         description=(
-            "Demo-agnostic implementation skills that should be applied when building the demo."
+            "Skill slugs required for implementation. Must include guardrails, presets, format parity, and generated-output labeling."
         ),
     )
     project_changes: list[str] = Field(

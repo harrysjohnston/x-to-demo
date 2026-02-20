@@ -287,33 +287,35 @@ TextOrEmbeddedData = str | EmbeddedDataObject
 
 
 class PresetInputSet(StrictSchemaModel):
-    """Global synthetic preset that can populate runtime inputs."""
+    """Selectable synthetic input preset that populates runtime UI fields."""
 
     preset_id: str = Field(description="Stable preset identifier.")
-    label: str = Field(description="User-facing preset label.")
+    label: str = Field(description="User-visible preset label.")
     ordered_inputs: list[str] = Field(
         min_length=1,
-        description="Deterministic ordered runtime inputs populated by this preset.",
+        description="Exact ordered inputs applied when this preset is selected.",
     )
     where_used_in_headline_flows: list[str] = Field(
-        default_factory=list,
-        description="Capability refs or walkthrough step ids where this preset is used.",
+        min_length=1,
+        description=(
+            "Headline capability refs or walkthrough step ids that this preset exercises."
+        ),
     )
     expected_outputs: TextOrEmbeddedData = Field(
-        description="Expected output if the user explicitly runs this preset."
+        description="Expected outputs if the user explicitly runs the preset."
     )
     notes: str = Field(description="Additional preset notes, or 'none'.")
 
 
 class FirstRunInputSet(StrictSchemaModel):
-    """Legacy first-run input contract retained for markdown compatibility helpers."""
+    """Deprecated first-run input shape kept for backward compatibility."""
 
     ordered_inputs: list[str] = Field(
         min_length=1,
-        description="Legacy ordered inputs migrated into presets.",
+        description="Legacy first-run ordered inputs.",
     )
     trigger_action: str = Field(
-        description="Legacy trigger text migrated to explicit preset execution behavior."
+        description="Legacy trigger action. Deprecated in favor of explicit run controls."
     )
 
 
@@ -352,40 +354,34 @@ class RequiredSyntheticAsset(StrictSchemaModel):
 
 
 class SyntheticDemoInputs(StrictSchemaModel):
-    """Synthetic-first dataset and selectable presets for deterministic demos."""
+    """Synthetic dataset and selectable preset inputs for deterministic demos."""
 
     seed_dataset: TextOrEmbeddedData = Field(
         description="Small safe seed dataset (embedded text or structured object)."
     )
     input_presets: list[PresetInputSet] = Field(
-        default_factory=lambda: [
-            PresetInputSet(
-                preset_id="default-preset",
-                label="Default preset",
-                ordered_inputs=["Synthetic preset input"],
-                where_used_in_headline_flows=[],
-                expected_outputs="Expected output after explicit run action.",
-                notes="none",
-            )
-        ],
-        min_length=1,
-        description="Global selectable presets used to populate runtime inputs.",
+        default_factory=list,
+        description=(
+            "Global selectable presets. Applying a preset must populate UI inputs only and must not auto-execute."
+        ),
     )
     default_selected_preset_id: str = Field(
-        default="default-preset",
-        description="Preset id that should be selected by default in the UI.",
+        default="",
+        description="Preset id that is pre-selected in UI controls.",
     )
     preset_application_behavior: str = Field(
-        default=(
-            "Applying a preset populates runtime input fields only; it does not execute the flow."
-        ),
-        description="Must state that applying a preset populates UI only and does not execute.",
+        default="Applying a preset populates UI inputs only; it does not execute the flow.",
+        description="How apply-preset control populates UI values without execution.",
     )
     preset_execution_behavior: str = Field(
-        default=(
-            "Preset execution requires explicit user action (Run/Submit) after inputs are populated."
+        default="Execution requires explicit user action (run/submit).",
+        description="How run/submit control executes after a preset is applied.",
+    )
+    default_first_run_inputs: FirstRunInputSet | None = Field(
+        default=None,
+        description=(
+            "Deprecated legacy first-run field retained for artifact compatibility; do not rely on auto-run."
         ),
-        description="Must state that running a preset requires explicit user action.",
     )
     why_this_data: str = Field(
         description="How the synthetic data covers the one-to-three headline demo items."
@@ -393,8 +389,11 @@ class SyntheticDemoInputs(StrictSchemaModel):
     safety_and_realism_notes: str = Field(
         description="Confirms non-PII safe data while preserving realistic but bounded behavior."
     )
-    expected_outputs: TextOrEmbeddedData = Field(
-        description="Expected first-run outputs as concise text or structured object."
+    expected_outputs: TextOrEmbeddedData | None = Field(
+        default=None,
+        description=(
+            "Deprecated legacy field for first-run expected outputs. Prefer preset-level expected_outputs."
+        ),
     )
     required_assets: list[RequiredSyntheticAsset] = Field(
         description=(
@@ -464,14 +463,57 @@ class SyntheticDemoInputs(StrictSchemaModel):
 
         return data
 
-    @property
-    def default_first_run_inputs(self) -> FirstRunInputSet:
-        """Compatibility projection for callers that still render legacy first-run sections."""
-        first_preset = self.input_presets[0]
-        return FirstRunInputSet(
-            ordered_inputs=first_preset.ordered_inputs,
-            trigger_action=self.preset_execution_behavior,
-        )
+
+class RuntimeInputAndGuardrails(StrictSchemaModel):
+    """Runtime input capture and server-side guardrail behavior contract."""
+
+    accepts_runtime_inputs: Literal[True] = Field(
+        default=True,
+        description="Must be true: runtime inputs are accepted from the demo UI.",
+    )
+    supported_input_modalities: list[str] = Field(
+        default_factory=list,
+        description="Demo-specific runtime input modalities supported by the UI.",
+    )
+    input_capture_summary: str = Field(
+        default="Runtime inputs are captured in explicit demo UI controls.",
+        description="How and where runtime inputs are collected in the demo.",
+    )
+    guardrails_pipeline_summary: list[str] = Field(
+        default_factory=lambda: [
+            "Deterministic type/format/size checks run server-side before model calls.",
+            "Relevance check uses a model call with structured output.",
+            "Safety check uses a model call with structured output.",
+        ],
+        description=(
+            "Ordered summary of guardrail checks that must include type validation, relevance, and safety."
+        ),
+    )
+    relevance_check_summary: str = Field(
+        default="Server calls a relevance classifier model that returns structured JSON verdict.",
+        description="Structured-output relevance check summary.",
+    )
+    safety_check_summary: str = Field(
+        default="Server calls a safety classifier model that returns structured JSON verdict.",
+        description="Structured-output safety check summary.",
+    )
+    user_visible_outcomes_on_reject: list[str] = Field(
+        default_factory=lambda: [
+            "Show a clear reject reason in the input panel.",
+            "Keep user input editable for retry.",
+        ],
+        description="User-visible reject outcomes and where messages appear.",
+    )
+    cancel_flow_behavior: str = Field(
+        default=(
+            "Reject verdict cancels flow before main model call, preserves UI state, and allows edit/try again."
+        ),
+        description="Explicit reject behavior: no main model call and retry-friendly UI state.",
+    )
+    presets_go_through_same_guardrails: Literal[True] = Field(
+        default=True,
+        description="Must be true: applied presets use the same guardrail pipeline as manual input.",
+    )
 
 
 class ConsistencyTrace(StrictSchemaModel):
@@ -515,59 +557,6 @@ class InteractionRequirements(StrictSchemaModel):
     )
     requires_tool_loop: bool = Field(
         description="True when any headline demo item requires iterative tool-use/planning loops."
-    )
-
-
-class RuntimeInputAndGuardrails(StrictSchemaModel):
-    """Demo-specific runtime input contract and server-side guardrails behavior."""
-
-    accepts_runtime_inputs: Literal[True] = Field(
-        default=True, description="Must be true: demo accepts runtime inputs from the UI."
-    )
-    supported_input_modalities: list[str] = Field(
-        default_factory=lambda: ["text"],
-        description="Demo-specific runtime input modalities accepted by the UI/API.",
-    )
-    input_capture_summary: str = Field(
-        default="Runtime inputs are captured from visible UI controls in the demo views.",
-        description="What runtime inputs the UI accepts and where.",
-    )
-    guardrails_pipeline_summary: list[str] = Field(
-        default_factory=lambda: [
-            "Deterministic type/format/size checks",
-            "Relevance model call with structured output verdict",
-            "Safety model call with structured output verdict",
-        ],
-        description="Ordered guardrail pipeline summary including type, relevance, and safety.",
-    )
-    relevance_check_summary: str = Field(
-        default="Server performs a relevance model call that returns a structured relevance verdict.",
-        description="Summary of the relevance model-call guardrail.",
-    )
-    safety_check_summary: str = Field(
-        default="Server performs a safety model call that returns a structured safety verdict.",
-        description="Summary of the safety model-call guardrail.",
-    )
-    user_visible_outcomes_on_reject: list[str] = Field(
-        default_factory=lambda: [
-            "Show an unsupported-input message in the input panel.",
-            "Show a safety/relevance rejection message near the run action.",
-        ],
-        description="User-visible reject outcomes and where messages appear.",
-    )
-    cancel_flow_behavior: str = Field(
-        default=(
-            "On reject, cancel before the main model call, preserve current UI state, and allow "
-            "user edits/retry."
-        ),
-        description=(
-            "Must explicitly state no main model call occurs on reject; UI state is preserved and "
-            "edit/try-again remains available."
-        ),
-    )
-    presets_go_through_same_guardrails: Literal[True] = Field(
-        default=True,
-        description="Must be true: preset-populated inputs use the same guardrails pipeline.",
     )
 
 
@@ -615,10 +604,7 @@ class DemoSpecArtifact(ArtifactBase):
         ),
     )
     synthetic_demo_inputs: SyntheticDemoInputs = Field(
-        description=(
-            "Synthetic-first data package with global selectable presets that populate runtime inputs "
-            "without auto-running."
-        )
+        description="Synthetic dataset and selectable presets used to populate runtime inputs."
     )
     consistency_trace: ConsistencyTrace = Field(
         description="Cross-phase consistency commitments for stable headline identifiers."
