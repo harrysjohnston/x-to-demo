@@ -31,6 +31,10 @@ def test_build_phase_prompts_includes_global_hard_rules() -> None:
     assert "Constrain scope to one to three headline items only." in developer_prompt
     assert "Walkthrough means an in-app interactive UI tour" in developer_prompt
     assert (
+        "No inert buttons: every interactive element must have defined behavior and automated test coverage."
+        in developer_prompt
+    )
+    assert (
         "Do not add fields, wrappers, markdown, or prose outside schema fields." in developer_prompt
     )
     assert "Priority checklist (must satisfy all):" in user_prompt
@@ -47,6 +51,11 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
         "Map each headline capability into a concise demo item with a clear AI moment."
         in developer_prompt
     )
+    assert (
+        "DemoSpec must include interaction_contracts covering every minimalist view"
+        in developer_prompt
+    )
+    assert "Interaction contracts must be complete" in developer_prompt
     assert "not a presenter script." in developer_prompt
     assert (
         "Specify interactive walkthrough (auto-start on launch, retrigger path, cancellable controls)."
@@ -56,6 +65,11 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
         "Provide synthetic seed data, default first-run inputs, and expected first-run outputs."
         in user_prompt
     )
+    assert (
+        "Include interaction_contracts for each minimalist view: enumerate every control"
+        in user_prompt
+    )
+    assert "Ensure screen_name matches DemoExperience.minimalist_views[*].name" in user_prompt
     assert "Provide consistency trace to phase-1 headline capability identifiers." in user_prompt
     assert "Keep tooling decision consistent with phase 1." in user_prompt
     assert "Confirm system theme support and device framing" in user_prompt
@@ -90,6 +104,10 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "TestingStrategy must include a dedicated deterministic walkthrough test suite"
         in developer_prompt
     )
+    assert (
+        "TestingStrategy must include interaction_test_matrix where each DemoSpec control_id"
+        in developer_prompt
+    )
     assert "Include README requirements with exact setup steps" in developer_prompt
     assert "Choose OpenAI API(s) and initial prompts aligned to headline items." in user_prompt
     assert "If any headline item is voice, include Realtime." in user_prompt
@@ -120,6 +138,11 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         in user_prompt
     )
     assert (
+        "Include TestingStrategy.interaction_test_matrix mapping every control_id_ref"
+        in user_prompt
+    )
+    assert "Set interaction_test_matrix.rule to include" in user_prompt
+    assert (
         "Do not use vague test language; provide concrete targets, mocks, and verification steps."
         in user_prompt
     )
@@ -139,6 +162,7 @@ def test_code_spec_schema_requires_explicit_testing_strategy_fields() -> None:
     assert "mocking_instructions" in required
     assert "verification_steps" in required
     assert "walkthrough_test_suite_requirements" in required
+    assert "interaction_test_matrix" in required
 
 
 def test_code_spec_schema_requires_walkthrough_state_machine_model() -> None:
@@ -171,6 +195,22 @@ def test_openai_compatible_schema_keeps_code_spec_nested_objects_strict() -> Non
     testing_schema = normalized["$defs"][testing_name]
     assert testing_schema["additionalProperties"] is False
     assert "walkthrough_test_suite_requirements" in set(testing_schema["required"])
+    assert "interaction_test_matrix" in set(testing_schema["required"])
+
+    matrix_name = testing_schema["properties"]["interaction_test_matrix"]["$ref"].split("/")[-1]
+    matrix_schema = normalized["$defs"][matrix_name]
+    assert matrix_schema["additionalProperties"] is False
+    assert set(matrix_schema["required"]) == {"execution_notes", "matrix", "rule"}
+
+    item_name = matrix_schema["properties"]["matrix"]["items"]["$ref"].split("/")[-1]
+    item_schema = normalized["$defs"][item_name]
+    assert item_schema["additionalProperties"] is False
+    assert set(item_schema["required"]) == {
+        "control_id_ref",
+        "loading_state_expectation",
+        "when_disabled_expectation",
+        "when_enabled_expectation",
+    }
 
 
 def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
@@ -181,10 +221,28 @@ def test_demo_spec_schema_requires_synthetic_inputs_and_trace_fields() -> None:
     assert "consistency_trace" in required
     assert "tooling_decision_trace" in required
     assert "interaction_requirements" in required
+    assert "interaction_contracts" in required
 
     headline_ref = schema["properties"]["headline_demo_items"]["items"]["$ref"].split("/")[-1]
     headline_props = schema["$defs"][headline_ref]["properties"]
     assert "interaction_mode" in headline_props
+
+    interaction_contracts_ref = schema["properties"]["interaction_contracts"]["items"]["$ref"]
+    contracts_name = interaction_contracts_ref.split("/")[-1]
+    contracts_schema = schema["$defs"][contracts_name]
+    assert set(contracts_schema["required"]) == {"controls", "notes", "screen_name"}
+
+    control_ref = contracts_schema["properties"]["controls"]["items"]["$ref"].split("/")[-1]
+    control_schema = schema["$defs"][control_ref]
+    assert set(control_schema["required"]) == {
+        "control_id",
+        "control_type",
+        "enablement_rules",
+        "expected_behavior",
+        "label_or_icon_description",
+        "loading_state",
+        "observable_state_or_ui_change",
+    }
 
 
 def test_code_spec_schema_requires_synthetic_data_and_tooling_trace_fields() -> None:

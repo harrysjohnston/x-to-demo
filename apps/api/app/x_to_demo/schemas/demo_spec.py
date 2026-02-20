@@ -89,6 +89,82 @@ class MinimalistView(StrictSchemaModel):
     )
 
 
+class ControlLoadingState(StrictSchemaModel):
+    """Loading/working-state behavior contract for one control."""
+
+    has_loading_state: bool = Field(
+        description="Whether the control shows a loading/working state when activated."
+    )
+    loading_ui_behavior: str = Field(
+        description=(
+            "What the UI does while loading (spinner/disabled/label change), and what ends "
+            "the loading state. Use 'not applicable' if has_loading_state is false."
+        )
+    )
+
+
+class ControlEnablementRules(StrictSchemaModel):
+    """Enable/disable rules and disabled explanation for one control."""
+
+    enabled_when: list[str] = Field(
+        min_length=1,
+        description="Concrete conditions under which the control is enabled.",
+    )
+    disabled_when: list[str] = Field(
+        min_length=1,
+        description="Concrete conditions under which the control is disabled.",
+    )
+    disabled_explanation: str = Field(
+        description="What the UI shows/explains when disabled (tooltip/helper text/inline message)."
+    )
+
+
+class InteractiveControlContract(StrictSchemaModel):
+    """Functional contract for one interactive control."""
+
+    control_id: str = Field(
+        description="Stable identifier for the control used for mapping into tests and walkthrough targets."
+    )
+    label_or_icon_description: str = Field(
+        description="User-visible label, or icon description when the control is icon-only."
+    )
+    control_type: str = Field(
+        description="Type of control (button, toggle, text input, select, slider, and similar)."
+    )
+    expected_behavior: str = Field(
+        description="Exactly what happens when the user interacts with the control."
+    )
+    observable_state_or_ui_change: str = Field(
+        description=(
+            "Observable UI/state signal that proves the control worked (state change, navigation, "
+            "new content, toast/message, tool-call log entry, and similar). If the control is "
+            "disabled in some states, this should describe enabled-state behavior."
+        )
+    )
+    enablement_rules: ControlEnablementRules = Field(
+        description="Enable/disable rules and disabled explanation."
+    )
+    loading_state: ControlLoadingState = Field(
+        description="Loading/working UI behavior for this control."
+    )
+
+
+class ScreenInteractionContracts(StrictSchemaModel):
+    """Per-screen inventory of interactive controls and their behavior contracts."""
+
+    screen_name: str = Field(
+        description=(
+            "Name of the screen/view this contract applies to. Must match one of "
+            "DemoExperience.minimalist_views[*].name."
+        )
+    )
+    controls: list[InteractiveControlContract] = Field(
+        min_length=1,
+        description="Inventory of every interactive control on this screen.",
+    )
+    notes: str = Field(description="Clarifying notes for this screen's interactions (or 'none').")
+
+
 class ThemeSupport(StrictSchemaModel):
     """Theme support constraints for the demo UI."""
 
@@ -311,6 +387,13 @@ class DemoSpecArtifact(ArtifactBase):
     )
     demo_experience: DemoExperience = Field(
         description="Minimalist views, device targeting, and system theme support."
+    )
+    interaction_contracts: list[ScreenInteractionContracts] = Field(
+        min_length=1,
+        description=(
+            "Required per-screen inventory of every interactive control and expected behavior, "
+            "including enable/disable rules and loading states."
+        ),
     )
     interactive_walkthrough: InteractiveWalkthrough = Field(
         description="In-app interactive walkthrough requirements."

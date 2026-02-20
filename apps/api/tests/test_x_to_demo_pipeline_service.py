@@ -190,7 +190,7 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                     "name": "Output",
                     "purpose": "Show AI-generated structured summary.",
                     "primary_component": "SummaryPanel",
-                    "visible_elements": ["summary card", "evidence list"],
+                    "visible_elements": ["summary card", "evidence list", "rerun button"],
                     "hidden_or_omitted_elements": ["analytics widgets"],
                 },
             ],
@@ -205,6 +205,72 @@ def _demo_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 },
             },
         },
+        "interaction_contracts": [
+            {
+                "screen_name": "Input",
+                "controls": [
+                    {
+                        "control_id": "input_editor",
+                        "label_or_icon_description": "Input X text area",
+                        "control_type": "text_input",
+                        "expected_behavior": "User can type or paste Input X content.",
+                        "observable_state_or_ui_change": "Editor state updates and character count changes.",
+                        "enablement_rules": {
+                            "enabled_when": ["View is loaded and editor is mounted."],
+                            "disabled_when": ["No disabled state in this demo path."],
+                            "disabled_explanation": "not applicable",
+                        },
+                        "loading_state": {
+                            "has_loading_state": False,
+                            "loading_ui_behavior": "not applicable",
+                        },
+                    },
+                    {
+                        "control_id": "run_demo",
+                        "label_or_icon_description": "Run demo button",
+                        "control_type": "button",
+                        "expected_behavior": "Starts AI summarization using current editor input.",
+                        "observable_state_or_ui_change": (
+                            "Button enters loading, then summary panel content renders in Output view."
+                        ),
+                        "enablement_rules": {
+                            "enabled_when": ["Input editor contains non-empty content."],
+                            "disabled_when": ["Input editor is empty."],
+                            "disabled_explanation": "Inline helper text prompts user to add input before running.",
+                        },
+                        "loading_state": {
+                            "has_loading_state": True,
+                            "loading_ui_behavior": "Disable button and show spinner until summary render completes.",
+                        },
+                    },
+                ],
+                "notes": "none",
+            },
+            {
+                "screen_name": "Output",
+                "controls": [
+                    {
+                        "control_id": "rerun_demo",
+                        "label_or_icon_description": "Rerun demo button",
+                        "control_type": "button",
+                        "expected_behavior": "Resets to seed input and reruns deterministic summarization.",
+                        "observable_state_or_ui_change": (
+                            "Output content refreshes and updated run timestamp appears."
+                        ),
+                        "enablement_rules": {
+                            "enabled_when": ["Synthetic seed data is loaded and app is idle."],
+                            "disabled_when": ["A run is already in progress."],
+                            "disabled_explanation": "Button label changes to Running... while current run completes.",
+                        },
+                        "loading_state": {
+                            "has_loading_state": True,
+                            "loading_ui_behavior": "Disable button with loading label until rerun finishes.",
+                        },
+                    }
+                ],
+                "notes": "Output cards are display-only; rerun is the only interactive output control.",
+            },
+        ],
         "interactive_walkthrough": {
             "auto_start_on_launch": True,
             "retrigger_mechanism": "Help button in the header.",
@@ -468,6 +534,50 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
                 "cancel anytime, finish, retrigger, enforce in-range step indexes, resolve "
                 "intended highlight targets, and verify targets are present/visible (enabled when applicable) at step display time."
             ),
+            "interaction_test_matrix": {
+                "rule": (
+                    "Every button clicked triggers an observable state/UI change OR is explicitly disabled with explanation."
+                ),
+                "matrix": [
+                    {
+                        "control_id_ref": "input_editor",
+                        "when_enabled_expectation": (
+                            "Typing updates editor state and character count in real time."
+                        ),
+                        "when_disabled_expectation": (
+                            "Control remains enabled in this demo; assert no disabled affordance is shown."
+                        ),
+                        "loading_state_expectation": "not applicable",
+                    },
+                    {
+                        "control_id_ref": "run_demo",
+                        "when_enabled_expectation": (
+                            "Clicking run starts request and renders summary output after completion."
+                        ),
+                        "when_disabled_expectation": (
+                            "With empty input, run button stays disabled and helper copy explains why."
+                        ),
+                        "loading_state_expectation": (
+                            "Button shows loading spinner/disabled state during request and resets on completion."
+                        ),
+                    },
+                    {
+                        "control_id_ref": "rerun_demo",
+                        "when_enabled_expectation": (
+                            "Clicking rerun refreshes output with deterministic seeded run results."
+                        ),
+                        "when_disabled_expectation": (
+                            "During active run, rerun is disabled and Running... explanation is shown."
+                        ),
+                        "loading_state_expectation": (
+                            "Rerun button remains disabled with loading label until refresh completes."
+                        ),
+                    },
+                ],
+                "execution_notes": (
+                    "Implement as deterministic UI integration tests with seeded fixtures under apps/web tests."
+                ),
+            },
         },
         "ui_constraints": {
             "minimalist_layout_rules": [

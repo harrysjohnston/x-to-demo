@@ -234,6 +234,48 @@ class WalkthroughImplementation(StrictSchemaModel):
     )
 
 
+class InteractionTestMatrixItem(StrictSchemaModel):
+    """Per-control deterministic interaction test expectations."""
+
+    control_id_ref: str = Field(
+        description="Reference to DemoSpec interaction_contracts.controls[*].control_id."
+    )
+    when_enabled_expectation: str = Field(
+        description=(
+            "What the automated test asserts when this control is enabled, including an "
+            "observable UI/state change."
+        )
+    )
+    when_disabled_expectation: str = Field(
+        description=(
+            "What the automated test asserts when this control is disabled, including the "
+            "disabled explanation/affordance."
+        )
+    )
+    loading_state_expectation: str = Field(
+        description="What the test asserts about loading behavior, or 'not applicable'."
+    )
+
+
+class InteractionTestMatrix(StrictSchemaModel):
+    """No-inert-controls deterministic test matrix contract."""
+
+    rule: str = Field(
+        pattern=".*Every button clicked triggers an observable state/UI change OR is explicitly disabled with explanation.*",
+        description=(
+            "Must include the rule: 'Every button clicked triggers an observable state/UI "
+            "change OR is explicitly disabled with explanation.'"
+        ),
+    )
+    matrix: list[InteractionTestMatrixItem] = Field(
+        min_length=1,
+        description="Per-control test expectations mapped by control_id.",
+    )
+    execution_notes: str = Field(
+        description="How these tests run deterministically (fixtures/mocks) and where they live."
+    )
+
+
 class TestingStrategy(StrictSchemaModel):
     """Testing requirements for deterministic demo delivery."""
 
@@ -297,6 +339,12 @@ class TestingStrategy(StrictSchemaModel):
             "cancel at any time; finish; retrigger; safe step-index bounds; highlight target "
             "resolution; and per-step validation that intended UI components are present/visible "
             "(and enabled when applicable) when shown."
+        )
+    )
+    interaction_test_matrix: InteractionTestMatrix = Field(
+        description=(
+            "Required interaction test matrix ensuring no inert controls. Must cover enabled "
+            "behavior, disabled explanation behavior, and loading-state behavior per control."
         )
     )
 
