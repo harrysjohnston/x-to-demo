@@ -916,7 +916,7 @@ def _build_openai_client(api_key: str) -> object:
         raise RuntimeError(
             "openai package is not installed. Add dependency and reinstall API environment."
         ) from exc
-    return OpenAI(api_key=api_key)
+    return OpenAI(api_key=api_key, timeout=1800.0)
 
 
 def get_x_to_demo_pipeline_service() -> XToDemoPipelineService:

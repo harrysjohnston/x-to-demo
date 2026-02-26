@@ -509,7 +509,6 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             "canonical-spec-format-parity",
             "generated-output-badge",
         ],
-        "project_changes": ["apps/web/components/XToDemoStudio.tsx"],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
         "state_model": {"fields": ["xInput", "phaseStatus", "artifacts"]},
         "ai_seam": {
@@ -1332,3 +1331,12 @@ def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present(
     assert "Iterate each preset through guardrails in mocked tests" in markdown
     assert "- runtime-input-guardrails-server-side" in markdown
     assert "- synthetic-input-presets" in markdown
+
+
+def test_code_spec_adds_multimodal_inputs_when_voice_required() -> None:
+    """When covers_requires_voice is True, multimodal-inputs is added to agent_skills_to_apply."""
+    payload = _code_spec_payload()
+    payload["openai_integration"]["covers_requires_voice"] = True
+    payload["agent_skills_to_apply"] = ["runtime-input-guardrails-server-side"]
+    artifact = CodeSpecArtifact.model_validate(payload)
+    assert "multimodal-inputs" in artifact.agent_skills_to_apply

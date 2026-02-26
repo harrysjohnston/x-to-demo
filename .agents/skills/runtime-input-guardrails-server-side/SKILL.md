@@ -13,6 +13,10 @@ Use this skill when a demo accepts runtime user input and must gate inputs befor
 - Input can be text, file, image, or audio
 - The demo requires relevance/safety checks before feature execution
 
+## Audio Input Capture
+
+For audio/voice input, capture must follow the **multimodal-inputs** skill: push-to-record (press-and-hold or explicit start/stop) is the primary path. Do not use file-upload-only, auto-recording, or background capture as the primary input path.
+
 ## Canonical Architecture (Server-Side Only)
 
 1. Client captures runtime input and sends it to the API.

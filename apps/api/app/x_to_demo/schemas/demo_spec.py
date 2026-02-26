@@ -477,7 +477,11 @@ class RuntimeInputAndGuardrails(StrictSchemaModel):
     )
     input_capture_summary: str = Field(
         default="Runtime inputs are captured in explicit demo UI controls.",
-        description="How and where runtime inputs are collected in the demo.",
+        description=(
+            "How and where runtime inputs are collected in the demo. When voice or audio is a "
+            "supported modality, must describe push-to-record (press-and-hold or explicit start/stop) "
+            "as the primary capture method."
+        ),
     )
     guardrails_pipeline_summary: list[str] = Field(
         default_factory=lambda: [

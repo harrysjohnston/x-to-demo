@@ -118,4 +118,8 @@ Or run individual jobs:
 - Deployment: `/docs/deployment.md`
 - Architecture notes: `/architecture_decisions.md`
 
+## Development
+
+When implementing multimodal inputs (audio or image), enable the **OpenAI docs MCP** in your environment. Use it to look up supported file types and formats for the OpenAI APIs (e.g. `mcp_openaiDeveloperDocs_search_openai_docs` with queries like "image file types supported vision" or "audio file types supported"). The `.agents/skills/multimodal-inputs` skill uses these allowlists for record/capture/upload validation.
+
 Last reviewed: 2026-02-20

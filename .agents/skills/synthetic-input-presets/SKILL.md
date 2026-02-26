@@ -1,6 +1,6 @@
 ---
 name: synthetic-input-presets
-description: Conventions for synthetic demo inputs as global, selectable presets that populate UI without auto-running, plus storage layout and integration-test coverage expectations.
+description: Conventions for synthetic demo inputs as global, selectable presets that populate UI without auto-running. Every planned flow must be covered by some preset. Includes storage layout and integration-test coverage expectations.
 ---
 
 # Synthetic Input Presets
@@ -12,6 +12,10 @@ Use this skill when a demo includes seeded/synthetic example inputs.
 - Demo uses sample/synthetic data to make flows reproducible
 - Inputs should be user-selectable at runtime
 - You need predictable integration coverage for all presets
+
+## Flow Coverage (Required)
+
+Every planned flow within the demo must be covered by at least one synthetic preset. Collectively, presets must exercise all flows (headline items, main paths, guardrail-allow paths). No flow may exist without preset data that reaches it.
 
 ## UI Conventions (Required)
 
@@ -53,6 +57,7 @@ Keep preset content explicitly labeled synthetic/example data.
 
 ## Test Conventions (Required)
 
+- [ ] Every planned flow is covered by at least one preset
 - [ ] Integration tests iterate all defined presets
 - [ ] For each preset: apply -> run -> assert guardrails pass in mocked tier
 - [ ] For each preset: assert main flow is reached in mocked tier

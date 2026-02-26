@@ -122,6 +122,8 @@ def _yes_no_unknown(value: Any) -> str:
 
 _XML_LIST_WRAPPER = "item"
 _XML_EMPTY_LIST_MARKER = "_empty"
+_XML_JSON_TYPE_ATTR = "@_json_type"
+_XML_JSON_TEXT_KEY = "#text"
 
 
 def _dict_to_xml_value(value: Any) -> Any:
@@ -132,12 +134,34 @@ def _dict_to_xml_value(value: Any) -> Any:
         if not value:
             return {_XML_EMPTY_LIST_MARKER: None}
         return {_XML_LIST_WRAPPER: [_dict_to_xml_value(item) for item in value]}
+    # Preserve scalar JSON types explicitly so XML->dict can be lossless.
+    if isinstance(value, bool):
+        return {_XML_JSON_TYPE_ATTR: "bool", _XML_JSON_TEXT_KEY: str(value).lower()}
+    if isinstance(value, int):
+        return {_XML_JSON_TYPE_ATTR: "int", _XML_JSON_TEXT_KEY: str(value)}
+    if isinstance(value, float):
+        return {_XML_JSON_TYPE_ATTR: "float", _XML_JSON_TEXT_KEY: repr(value)}
+    if value is None:
+        return {_XML_JSON_TYPE_ATTR: "null"}
     return value
 
 
 def _xml_to_dict_value(value: Any) -> Any:
     """Normalize parsed XML: unwrap {item: x} or {item: [a,b]} back to lists."""
     if isinstance(value, dict):
+        if _XML_JSON_TYPE_ATTR in value and set(value.keys()).issubset(
+            {_XML_JSON_TYPE_ATTR, _XML_JSON_TEXT_KEY}
+        ):
+            scalar_type = value[_XML_JSON_TYPE_ATTR]
+            text_value = value.get(_XML_JSON_TEXT_KEY)
+            if scalar_type == "bool":
+                return str(text_value).lower() == "true"
+            if scalar_type == "int":
+                return int(str(text_value))
+            if scalar_type == "float":
+                return float(str(text_value))
+            if scalar_type == "null":
+                return None
         if set(value.keys()) == {_XML_EMPTY_LIST_MARKER}:
             return []
         if set(value.keys()) == {_XML_LIST_WRAPPER}:
@@ -656,9 +680,6 @@ def render_code_spec_markdown(artifact: CodeSpecArtifact) -> str:
             "",
             "## Agent Skills To Apply",
             *_bullet_lines(artifact.agent_skills_to_apply),
-            "",
-            "## Project Changes",
-            *_bullet_lines(artifact.project_changes),
             "",
             "## Components",
             *_bullet_lines(artifact.components),

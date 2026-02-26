@@ -1,6 +1,6 @@
 ---
 name: demo-design-decisions
-description: Canonical design decisions for x-to-demo: guardrails (server-side, relevance + safety verdicts), synthetic presets (UI-selectable, test-validated). Use when implementing or modifying demos, guardrails, or preset systems.
+description: Canonical design decisions for x-to-demo: guardrails (server-side, relevance + safety verdicts), synthetic presets (UI-selectable, test-validated, every flow covered). Use when implementing or modifying demos, guardrails, or preset systems.
 ---
 
 # Demo Design Decisions
@@ -43,6 +43,7 @@ Synthetic inputs are **global presets** that users select in the UI. They are ne
 - **Global**: Presets are defined once and available across the demo, not per-component.
 - **Selectable**: User explicitly chooses a preset from a dropdown, list, or similar control.
 - **Not auto-run**: Presets do not execute automatically on load or navigation.
+- **Flow coverage**: Every planned flow in the demo must be covered by at least one synthetic preset. No flow may exist without preset data that exercises it.
 
 ---
 
@@ -62,6 +63,7 @@ Presets without passing integration tests (mocked tier) must not ship.
 ## Checklist for New Presets
 
 - [ ] Preset is a global, UI-selectable option (not auto-run)
+- [ ] Every planned flow has at least one preset that exercises it
 - [ ] Integration test exists in mocked-by-default tier
 - [ ] Test asserts preset produces expected output or state
 - [ ] Live-tier test added if needed for E2E validation

@@ -3,7 +3,4 @@ version = 1
 name = "hj-x-to-demo"
 
 [setup]
-script = '''
-source apps/api/.venv/bin/activate
-pnpm install
-'''
+script = "./scripts/bootstrap --skip-rename --skip-compose --skip-lint --skip-tests"

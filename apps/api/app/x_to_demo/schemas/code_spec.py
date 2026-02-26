@@ -13,6 +13,7 @@ REQUIRED_AGENT_SKILLS_TO_APPLY: tuple[str, ...] = (
     "synthetic-input-presets",
     "canonical-spec-format-parity",
     "generated-output-badge",
+    "openai-live-integration-tests",
 )
 
 
@@ -761,10 +762,6 @@ class CodeSpecArtifact(ArtifactBase):
             "Skill slugs required for implementation. Must include guardrails, presets, format parity, and generated-output labeling."
         ),
     )
-    project_changes: list[str] = Field(
-        default_factory=list,
-        description="Files/areas expected to change.",
-    )
     components: list[str] = Field(
         default_factory=list,
         description="Core UI/system components to build.",
@@ -807,6 +804,8 @@ class CodeSpecArtifact(ArtifactBase):
     @model_validator(mode="after")
     def ensure_required_agent_skills(self) -> CodeSpecArtifact:
         """Ensure mandatory implementation skills are always present."""
-        merged = list(dict.fromkeys([*self.agent_skills_to_apply, *REQUIRED_AGENT_SKILLS_TO_APPLY]))
-        self.agent_skills_to_apply = merged
+        skills = list(dict.fromkeys([*self.agent_skills_to_apply, *REQUIRED_AGENT_SKILLS_TO_APPLY]))
+        if self.openai_integration.covers_requires_voice:
+            skills = list(dict.fromkeys([*skills, "multimodal-inputs"]))
+        self.agent_skills_to_apply = skills
         return self

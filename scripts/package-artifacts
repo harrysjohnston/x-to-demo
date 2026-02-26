@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Package an artifacts subdirectory into a tarball that unpacks to:
+#   ./.plans/   - XML plans (feature_spec.xml, demo_spec.xml, code_spec.xml)
+#   ./.agents/  - entire contents of .agents
+#
+# Usage: scripts/package-artifacts <artifacts_dir> [output_path]
+#   artifacts_dir  - path to an artifacts run dir (e.g. apps/api/artifacts/x-to-demo/20260221T001809Z-ff488af4)
+#   output_path    - optional; defaults to <run_id>.tar.gz in current directory
+
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/package-artifacts <artifacts_dir> [output_path]
+
+  artifacts_dir  Path to an artifacts run directory (e.g. apps/api/artifacts/x-to-demo/20260221T001809Z-ff488af4)
+  output_path    Optional output tarball path; defaults to <run_id>.tar.gz in current directory
+
+Creates a tarball that when unpacked places:
+  - XML plans (feature_spec.xml, demo_spec.xml, code_spec.xml) in ./.plans/
+  - Entire .agents directory contents in ./.agents/
+USAGE
+}
+
+[[ $# -ge 1 ]] || { usage >&2; exit 1; }
+
+ARTIFACTS_DIR="$(cd "$1" && pwd)"
+OUTPUT_PATH="${2:-}"
+
+# Resolve repo root (where .agents lives)
+REPO_ROOT="$(cd "$ARTIFACTS_DIR" && git rev-parse --show-toplevel 2>/dev/null)" || true
+if [[ -z "$REPO_ROOT" ]]; then
+  # Fallback: walk up until we find .agents
+  REPO_ROOT="$ARTIFACTS_DIR"
+  while [[ "$REPO_ROOT" != "/" ]]; do
+    if [[ -d "$REPO_ROOT/.agents" ]]; then
+      break
+    fi
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+  done
+  if [[ ! -d "$REPO_ROOT/.agents" ]]; then
+    echo "Error: could not find .agents (run from git repo or ensure .agents exists)" >&2
+    exit 1
+  fi
+fi
+
+AGENTS_DIR="$REPO_ROOT/.agents"
+[[ -d "$AGENTS_DIR" ]] || { echo "Error: .agents not found at $AGENTS_DIR" >&2; exit 1; }
+
+# XML plans to include
+XML_PLANS=(feature_spec.xml demo_spec.xml code_spec.xml)
+for f in "${XML_PLANS[@]}"; do
+  [[ -f "$ARTIFACTS_DIR/$f" ]] || { echo "Error: $f not found in $ARTIFACTS_DIR" >&2; exit 1; }
+done
+
+# Default output: <run_id>.tar.gz in cwd
+RUN_ID="$(basename "$ARTIFACTS_DIR")"
+[[ -n "$OUTPUT_PATH" ]] || OUTPUT_PATH="$RUN_ID.tar.gz"
+if [[ "$OUTPUT_PATH" != /* ]]; then
+  OUTPUT_PATH="$(pwd)/$OUTPUT_PATH"
+fi
+
+# Build archive in a temp dir so paths are clean
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+mkdir -p "$TMP/.plans" "$TMP/.agents"
+cp "$ARTIFACTS_DIR"/feature_spec.xml "$ARTIFACTS_DIR"/demo_spec.xml "$ARTIFACTS_DIR"/code_spec.xml "$TMP/.plans/"
+cp -R "$AGENTS_DIR"/* "$TMP/.agents/"
+
+# Create tarball (gzip -n for reproducible output)
+cd "$TMP"
+tar -cf - .plans .agents | gzip -n > "$OUTPUT_PATH"
+
+echo "Created: $OUTPUT_PATH"
+echo "Unpack with: tar -xzf $OUTPUT_PATH"
