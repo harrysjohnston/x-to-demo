@@ -1,25 +1,12 @@
 # x-to-demo
 
-`x-to-demo` turns raw Input X into structured specifications through a three-phase pipeline.
+`x-to-demo` turns raw Input X into structured specifications through a three-phase pipeline (feature spec → demo spec → code spec).
 
-## What is retained
-
-- Local web app (`apps/web`) for running pipeline jobs and reviewing artifacts.
-- Local API (`apps/api`) that runs the x-to-demo pipeline and saves artifacts.
-- Pipeline schemas, canonical JSON/XML rendering, and resumable run artifacts.
-- Web/API tests, linting, and pre-commit checks.
-
-## What was removed
-
-- Auth and users
-- Database and migrations
-- Upload/storage services (S3/MinIO)
-- Email pipeline
-- Deployment/infra template assets
+**Prerequisites:** Docker (for `pnpm dev`), or Node/pnpm + Python/uv for running without Docker.
 
 ## Quick start
 
-1. Create env file:
+1. Create env file (or run `./scripts/bootstrap` for full setup):
 
 ```bash
 cp config/env.example .env
@@ -35,6 +22,13 @@ OPENAI_API_KEY=<your-key>
 
 ```bash
 pnpm dev
+```
+
+Or run without Docker (two terminals):
+
+```bash
+pnpm api:dev   # terminal 1
+pnpm web:dev   # terminal 2
 ```
 
 4. Open:
@@ -61,7 +55,7 @@ By default, artifacts are written under:
 
 `artifacts/x-to-demo/<run-id>/`
 
-Configure with `X_TO_DEMO_OUTPUT_DIR`.
+Configure with `X_TO_DEMO_OUTPUT_DIR`. Artifact `phase_key` values: `feature_spec`, `demo_spec`, `code_spec`.
 
 ## Local checks
 
@@ -71,55 +65,21 @@ pnpm typecheck
 pnpm test
 ```
 
-Run pre-commit hooks over all files:
+Run full suite (including e2e):
+
+```bash
+pnpm test:full
+```
+
+Run CI checks locally (lint, typecheck, tests); add `--pre-commit` to run pre-commit hooks:
 
 ```bash
 pnpm ci:local
+pnpm ci:local --pre-commit
 ```
-
-Or run individual jobs:
-
-```bash
-./scripts/ci-local --pre-commit   # pre-commit on all files (CI checks everything, not just staged)
-./scripts/ci-local --docker       # Docker build + health checks
-```
-
-**Why CI might fail when local checks pass:**
-
-- **Pre-commit**: CI runs `pre_commit run --all-files`; a normal `pre-commit run` only checks staged files, so unstaged or untracked issues are missed.
-- **Pre-commit**: CI installs deps from repo root with `uv pip install --system`; your venv or tool versions may differ.
-- **Docker**: CI runs on `ubuntu-latest`; platform/arch differences (e.g. macOS vs Linux) can cause build or runtime failures.
-
-## Current Prototype Constraints
-
-- Input X currently optimized for text-like raw inputs.
-- One pipeline run produces one code spec artifact set.
-- Pipeline is synchronous per request.
-- Output is designed for demo-build handoff, not production architecture.
-- Phase-2 `DemoSpec` artifacts now require `interaction_contracts` that enumerate every per-screen interactive control with behavior, observable effects, enable/disable rules, and loading-state expectations.
-- Phase-2 `DemoSpec` artifacts now require preset-driven synthetic input contracts: `synthetic_demo_inputs.input_presets`, `default_selected_preset_id`, `preset_application_behavior`, and `preset_execution_behavior` (populate-only semantics; no implicit auto-run).
-- Phase-2 `DemoSpec` artifacts now require `runtime_input_and_guardrails`, including supported input modalities, server-side guardrail pipeline summaries, reject outcomes, and explicit cancel-flow behavior (no main model call on reject).
-- Phase-2 `DemoSpec` artifacts now require `synthetic_demo_inputs.required_assets` (empty list allowed) to inventory every required synthetic text/image/audio asset with purpose, usage mapping, format/size constraints, and explicit synthetic labels.
-- Phase-3 `CodeSpec` artifacts now require `asset_generation_plan` describing per-modality OpenAI API/model choices, local generation scripts/commands, repo storage/naming, app loading/labeling behavior, mandatory guardrails, and `no_live_generation_on_startup=true`.
-- Phase-3 `CodeSpec` artifacts now require `ai_seam.guardrails.runtime_guardrails_plan` describing server-side deterministic validation plus two structured-output model calls (relevance then safety), verdict handling, and logging policy.
-- Phase-3 `CodeSpec` artifacts now require `agent_skills_to_apply` to declare implementation skills (guardrails, presets, parity hygiene, generated-output labeling).
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.interaction_test_matrix` that maps each control id to enabled/disabled/loading assertions under the no-inert-controls rule.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.synthetic_assets_validation` proving synthetic assets exist, pass basic file sanity checks, and that seeded startup flows do not depend on live generation calls.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.preset_inputs_integration_coverage` with explicit preset iteration/apply/guardrails/main-flow validation expectations.
-- Phase-3 `CodeSpec` artifacts now require `openai_integration.request_validation` describing preflight request checks, fail-fast behavior, and clear UI-visible error handling when validation fails.
-- Phase-3 `CodeSpec` artifacts now require `testing_strategy.openai_test_tiers` defining mocked tests that run by default and opt-in live smoke tests gated by `OPENAI_API_KEY` (and optional explicit flags) that can be skipped without failing the default suite.
-- Artifact schema version is now `0.3`; pre-`0.3` runs may fail edit/resume validation due stricter required fields and should be regenerated when needed.
-
-## Related Docs
-
-- Master plan: `/.plans/x-to-demo-master-plan.md`
-- Pipeline simplification plan: `/.plans/x-to-demo-pipeline-simplification.md`
-- Output contracts: `/.plans/x-to-demo-output-contracts.md`
-- Deployment: `/docs/deployment.md`
-- Architecture notes: `/architecture_decisions.md`
 
 ## Development
 
 When implementing multimodal inputs (audio or image), enable the **OpenAI docs MCP** in your environment. Use it to look up supported file types and formats for the OpenAI APIs (e.g. `mcp_openaiDeveloperDocs_search_openai_docs` with queries like "image file types supported vision" or "audio file types supported"). The `.agents/skills/multimodal-inputs` skill uses these allowlists for record/capture/upload validation.
 
-Last reviewed: 2026-02-20
+Last reviewed: 2026-03-05
