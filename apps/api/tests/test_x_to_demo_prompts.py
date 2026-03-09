@@ -39,6 +39,8 @@ def test_build_phase_prompts_includes_global_hard_rules() -> None:
     assert "Synthetic demo inputs are global selectable presets" in developer_prompt
     assert "must pass server-side guardrails before any main AI call" in developer_prompt
     assert "Guardrails pipeline order is mandatory" in developer_prompt
+    assert "avoid false rejects on intentional pathways" in developer_prompt
+    assert "UI must display the guardrail model's user_message" in developer_prompt
     assert "Keep specs demo-specific" in developer_prompt
     assert (
         "Do not add fields, wrappers, markdown, or prose outside schema fields." in developer_prompt
@@ -65,6 +67,8 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
     assert "Interaction contracts must be complete" in developer_prompt
     assert "runtime_input_and_guardrails" in developer_prompt
     assert "Runtime guardrails must apply identically" in developer_prompt
+    assert "Every happy-path flow must be represented by at least one preset" in developer_prompt
+    assert "guardrail verdict user_message" in developer_prompt
     assert "not a presenter script." in developer_prompt
     assert (
         "Specify interactive walkthrough (auto-start on launch, retrigger path, cancellable controls)."
@@ -81,6 +85,8 @@ def test_build_phase_prompts_includes_phase_specific_checklist_for_demo_spec() -
         "Ensure preset-applied inputs and manual runtime inputs pass through the same guardrails."
         in user_prompt
     )
+    assert "Ensure every happy-path flow has at least one preset" in user_prompt
+    assert "Ensure guardrail rejects display the guardrail verdict user_message" in user_prompt
     assert (
         "Include interaction_contracts for each minimalist view: enumerate every control"
         in user_prompt
@@ -128,6 +134,11 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "structured-output contract strings for RelevanceVerdict and SafetyVerdict"
         in developer_prompt
     )
+    assert (
+        "explicit in-scope allowlist derived from the demo's presets/happy-path flows"
+        in developer_prompt
+    )
+    assert "server must return the guardrail verdict user_message" in developer_prompt
     assert "CodeSpec must include agent_skills_to_apply" in developer_prompt
     assert "TestingStrategy must include preset_inputs_integration_coverage" in developer_prompt
     assert "Validate every OpenAI request before sending" in developer_prompt
@@ -153,6 +164,10 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
     )
     assert (
         "Define structured verdict contracts for relevance and safety guardrail calls"
+        in user_prompt
+    )
+    assert (
+        "Ensure relevance guardrails are calibrated to allow all preset-defined happy-path flows"
         in user_prompt
     )
     assert (
