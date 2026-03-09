@@ -279,7 +279,7 @@ class EmbeddedDataObject(StrictSchemaModel):
     summary: str = Field(description="What this embedded object contains.")
     sample_records: list[str] = Field(
         min_length=1,
-        description="Small deterministic sample records used by the demo.",
+        description=("Small deterministic sample records used by the demo."),
     )
 
 
@@ -293,7 +293,10 @@ class PresetInputSet(StrictSchemaModel):
     label: str = Field(description="User-visible preset label.")
     ordered_inputs: list[str] = Field(
         min_length=1,
-        description="Exact ordered inputs applied when this preset is selected.",
+        description=(
+            "Exact ordered inputs applied when this preset is selected. "
+            "One short value per UI field; avoid long prose."
+        ),
     )
     where_used_in_headline_flows: list[str] = Field(
         min_length=1,
@@ -302,9 +305,13 @@ class PresetInputSet(StrictSchemaModel):
         ),
     )
     expected_outputs: TextOrEmbeddedData = Field(
-        description="Expected outputs if the user explicitly runs the preset."
+        description=(
+            "Expected outputs if the user explicitly runs the preset. "
+            "Prefer EmbeddedDataObject with summary + sample_records when outputs are structured; "
+            "use a concise string for simple single-line expectations."
+        ),
     )
-    notes: str = Field(description="Additional preset notes, or 'none'.")
+    notes: str = Field(description="Brief notes or 'none'.")
 
 
 class FirstRunInputSet(StrictSchemaModel):

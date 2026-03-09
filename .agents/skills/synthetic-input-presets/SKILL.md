@@ -49,6 +49,15 @@ Recommended conventions:
 
 Keep preset content explicitly labeled synthetic/example data.
 
+## Inspectability (Required)
+
+Preset data must be human-readable at a glance and reviewable in git diffs.
+
+- `ordered_inputs`: one short value per UI field; avoid long paragraphs
+- `expected_outputs`: prefer `EmbeddedDataObject` (summary + sample_records) when outputs are structured; use concise string only for simple single-line expectations
+- `notes`: keep brief; use "none" when no notes
+- Preset labels and IDs must be stable and descriptive for quick scanning
+
 ## Execution Semantics
 
 - Applying presets and manually entered inputs must go through the same server-side guardrails
