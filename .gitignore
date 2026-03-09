@@ -30,6 +30,9 @@ htmlcov/
 .env.*.local
 .env.production
 
+# Rule refinement principle extraction cache
+.cache/
+
 # Run results / artifacts
 apps/api/artifacts/
 artifacts/
@@ -42,3 +45,5 @@ apps/api/app/x_to_demo/pipeline/prompts/*_prompts.md
 *.zip
 
 *.gz
+
+demo-build-rules.v*

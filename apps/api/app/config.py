@@ -78,6 +78,17 @@ class Settings(BaseSettings):
             "(supported: gpt-5.2, gpt-5.1, gpt-5-mini, gpt-5-nano, gpt-4.1-nano)"
         ),
     )
+    rule_refinement_model: str = Field(
+        default="gpt-5.2",
+        description=(
+            "Default OpenAI model used for rule refinement extraction "
+            "(supported: gpt-5.2, gpt-5.1, gpt-5-mini, gpt-5-nano, gpt-4.1-nano)"
+        ),
+    )
+    rule_refinement_reasoning_effort: str = Field(
+        default="low",
+        description="Default reasoning effort used for rule refinement Responses calls",
+    )
     x_to_demo_output_dir: str = Field(
         default="artifacts/x-to-demo",
         description="Directory where generated X-to-Demo artifacts are saved",
