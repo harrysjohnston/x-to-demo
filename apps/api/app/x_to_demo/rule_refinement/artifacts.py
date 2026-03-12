@@ -7,7 +7,12 @@ import re
 from typing import TYPE_CHECKING
 
 from .extractors import DemoBuildRulesLines
-from .models import NarrativeCritique, RuleRefinementIterationArtifact, RuleUpdateSuggestions
+from .models import (
+    NarrativeCritique,
+    ReductionCritique,
+    RuleRefinementIterationArtifact,
+    RuleUpdateSuggestions,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,10 +45,44 @@ def iteration_narrative_critique_path(base_path: Path, iteration_number: int) ->
     )
 
 
+def iteration_source_analysis_path(base_path: Path, iteration_number: int, source_key: str) -> Path:
+    """Build the persisted analysis markdown path for one source within an iteration."""
+    safe_key = re.sub(r"[^a-zA-Z0-9._-]+", "-", source_key).strip("-") or "source"
+    return base_path.with_name(
+        f"{base_path.stem}.iteration-{iteration_number:03d}.{safe_key}.analysis.md"
+    )
+
+
+def versioned_source_suggestion_path(base_path: Path, version: int, source_key: str) -> Path:
+    """Build the persisted structured suggestion path for one source improvement."""
+    safe_key = re.sub(r"[^a-zA-Z0-9._-]+", "-", source_key).strip("-") or "source"
+    return base_path.with_name(f"{base_path.stem}.v{version:03d}.{safe_key}.suggestion.json")
+
+
 def versioned_narrative_suggestion_path(base_path: Path, version: int, pass_number: int) -> Path:
     """Build the persisted narrative improvement suggestion path for one pass."""
     return base_path.with_name(
         f"{base_path.stem}.v{version:03d}.narrative-pass-{pass_number:02d}.json"
+    )
+
+
+def versioned_reduction_suggestion_path(base_path: Path, version: int, pass_number: int) -> Path:
+    """Build the persisted reduction editor suggestion path for one pass."""
+    return base_path.with_name(
+        f"{base_path.stem}.v{version:03d}.reduction-pass-{pass_number:02d}.editor.json"
+    )
+
+
+def versioned_reduction_critic_path(
+    base_path: Path,
+    version: int,
+    pass_number: int,
+    source_key: str,
+) -> Path:
+    """Build the persisted reduction critic artifact path for one source and pass."""
+    safe_key = re.sub(r"[^a-zA-Z0-9._-]+", "-", source_key).strip("-") or "source"
+    return base_path.with_name(
+        f"{base_path.stem}.v{version:03d}.reduction-pass-{pass_number:02d}.{safe_key}.critic.md"
     )
 
 
@@ -199,17 +238,51 @@ def render_narrative_critique_markdown(critique: NarrativeCritique) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_reduction_critique_markdown(critique: ReductionCritique) -> str:
+    """Render a reduction critic artifact as readable markdown."""
+    lines = ["# Reduction Critique", "", "## Missing Information"]
+    if critique.missing_information:
+        lines.extend(f"- {item}" for item in critique.missing_information)
+    else:
+        lines.append("- No missing information identified.")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def save_source_analysis_artifact(*, output_path: Path, analysis: str) -> None:
+    """Persist one source-gap analysis as markdown."""
+    output_path.write_text(analysis.rstrip() + "\n", encoding="utf-8")
+
+
 def save_narrative_critique_artifact(*, output_path: Path, critique: NarrativeCritique) -> None:
     """Persist the narrative critique as markdown."""
     output_path.write_text(render_narrative_critique_markdown(critique), encoding="utf-8")
+
+
+def save_rule_update_suggestion_artifact(
+    *, output_path: Path, suggestion: RuleUpdateSuggestions
+) -> None:
+    """Persist one structured rule update suggestion as JSON."""
+    payload = json.dumps(suggestion.model_dump(mode="json"), indent=2, sort_keys=True)
+    output_path.write_text(f"{payload}\n", encoding="utf-8")
 
 
 def save_narrative_suggestion_artifact(
     *, output_path: Path, suggestion: RuleUpdateSuggestions
 ) -> None:
     """Persist one narrative improvement suggestion as JSON."""
-    payload = json.dumps(suggestion.model_dump(mode="json"), indent=2, sort_keys=True)
-    output_path.write_text(f"{payload}\n", encoding="utf-8")
+    save_rule_update_suggestion_artifact(output_path=output_path, suggestion=suggestion)
+
+
+def save_reduction_suggestion_artifact(
+    *, output_path: Path, suggestion: RuleUpdateSuggestions
+) -> None:
+    """Persist one reduction editor suggestion as JSON."""
+    save_rule_update_suggestion_artifact(output_path=output_path, suggestion=suggestion)
+
+
+def save_reduction_critique_artifact(*, output_path: Path, critique: ReductionCritique) -> None:
+    """Persist one reduction critic output as markdown."""
+    output_path.write_text(render_reduction_critique_markdown(critique), encoding="utf-8")
 
 
 def _merge_windows(

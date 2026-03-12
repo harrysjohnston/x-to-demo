@@ -6,6 +6,7 @@
     "apps/*"
   ],
   "scripts": {
+    "setup": "./scripts/bootstrap",
     "dev": "docker compose up --build",
     "dev:down": "docker compose down",
     "web:dev": "pnpm -C apps/web dev",

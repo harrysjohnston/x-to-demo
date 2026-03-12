@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenAI Audio & Speech"
+  short_description: "Build STT, TTS, and audio workflows"
+  default_prompt: "Use $openai-audio-speech to implement OpenAI speech-to-text, text-to-speech, translation, or realtime audio workflows with the right endpoint and constraints."

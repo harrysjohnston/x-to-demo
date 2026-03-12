@@ -33,6 +33,9 @@ htmlcov/
 # Rule refinement principle extraction cache
 .cache/
 
+# Rule refinement usage and cost metrics (per-iteration)
+rule_refinement_metrics/
+
 # Run results / artifacts
 apps/api/artifacts/
 artifacts/
@@ -47,3 +50,8 @@ apps/api/app/x_to_demo/pipeline/prompts/*_prompts.md
 *.gz
 
 demo-build-rules.v*
+apps/rule_refinement_extracted/
+
+.playwright-cli/
+.agents/demo-build-rules.iteration-*analysis.md
+.agents/demo-build-rules.iteration-*narrative-critique.md

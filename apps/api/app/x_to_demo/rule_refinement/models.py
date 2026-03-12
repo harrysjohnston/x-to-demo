@@ -13,18 +13,7 @@ class RefinementSource(BaseModel):
     source_key: str = Field(description="Stable identifier for the extracted source content")
     title: str = Field(description="Human-readable label for the extracted source content")
     content: str = Field(
-        min_length=1, description="Source rule text passed to the principle extractor"
-    )
-
-
-class ExtractedPrinciples(BaseModel):
-    """Structured output returned by the principle extraction call."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    principles: list[str] = Field(
-        default_factory=list,
-        description="Atomic principles distilled from the source rule text",
+        min_length=1, description="Source rule text passed to the gap analysis stage"
     )
 
 
@@ -82,6 +71,10 @@ class RuleRefinementCallMetrics(BaseModel):
         default_factory=dict,
         description="Token usage reported by the Responses API",
     )
+    cost: dict[str, float] | None = Field(
+        default=None,
+        description="Estimated API cost from usage and local pricing rates",
+    )
 
 
 class RuleRefinementSourceResult(BaseModel):
@@ -92,30 +85,22 @@ class RuleRefinementSourceResult(BaseModel):
     source_key: str = Field(description="Stable source identifier")
     title: str = Field(description="Human-readable source label")
     input_rules_path: str = Field(description="Rules document path consumed for this source step")
-    principles: list[str] = Field(
-        default_factory=list,
-        description="Distilled principles returned by the extraction call",
+    analysis: str = Field(
+        description="Freeform analysis of missing source aspects vs current rules"
     )
+    analysis_path: str = Field(description="Persisted path for the source analysis artifact")
     suggestion: RuleUpdateSuggestions = Field(
         description="Line replacement and append suggestions returned for this source",
     )
-    extraction_metrics: RuleRefinementCallMetrics = Field(
-        description="Metrics for the principle extraction call",
+    analysis_metrics: RuleRefinementCallMetrics = Field(
+        description="Metrics for the source gap analysis call",
     )
     suggestion_metrics: RuleRefinementCallMetrics = Field(
-        description="Metrics for the update suggestion call",
+        description="Metrics for the source improvement call",
     )
-    applied_artifact: RuleRefinementIterationArtifact = Field(
-        description="Versioned rules and diff artifacts saved immediately after source updates",
-    )
-    consolidation_suggestion: RuleUpdateSuggestions = Field(
-        description="Line updates returned by the consolidation call",
-    )
-    consolidation_metrics: RuleRefinementCallMetrics = Field(
-        description="Metrics for the consolidation call",
-    )
+    suggestion_path: str = Field(description="Persisted path for the source improvement suggestion")
     output_artifact: RuleRefinementIterationArtifact = Field(
-        description="Versioned rules and diff artifacts saved after consolidation",
+        description="Versioned rules and diff artifacts saved after this source improvement",
     )
 
 
@@ -174,6 +159,103 @@ class NarrativeTuningIterationResult(BaseModel):
     )
 
 
+class ReductionCritique(BaseModel):
+    """Structured output returned by one reduction critic call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    missing_information: list[str] = Field(
+        default_factory=list,
+        description="Concrete pieces of source information missing from the reduced rules",
+    )
+
+
+class ReductionCriticResult(BaseModel):
+    """Recorded outcome for one source-specific reduction critic call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_key: str = Field(description="Stable source identifier")
+    title: str = Field(description="Human-readable source label")
+    critique: ReductionCritique = Field(
+        description="Missing-information findings for this source after reduction edits",
+    )
+    critique_metrics: RuleRefinementCallMetrics = Field(
+        description="Metrics for the source-specific reduction critic call",
+    )
+    critique_path: str = Field(description="Persisted path for the reduction critic artifact")
+
+
+class ReductionEditorResult(BaseModel):
+    """Recorded outcome for one reduction editor pass."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_rules_path: str = Field(description="Rules document path consumed by the editor")
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Parent-process notes passed into the editor for this pass",
+    )
+    suggestion: RuleUpdateSuggestions = Field(
+        description="Line replacement and append suggestions returned by the editor",
+    )
+    suggestion_metrics: RuleRefinementCallMetrics = Field(
+        description="Metrics for the reduction editor call",
+    )
+    suggestion_path: str = Field(description="Persisted path for the reduction editor suggestion")
+    output_artifact: RuleRefinementIterationArtifact = Field(
+        description="Saved artifacts produced after applying and normalizing the editor changes",
+    )
+
+
+class ReductionPassResult(BaseModel):
+    """Recorded outcome for one end-of-run reduction pass."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pass_number: int = Field(description="1-based reduction pass number")
+    editor_result: ReductionEditorResult = Field(
+        description="Editor inputs, outputs, and persisted artifacts for this pass",
+    )
+    critic_results: list[ReductionCriticResult] = Field(
+        default_factory=list,
+        description="Ordered source-specific critic outcomes for this pass",
+    )
+    line_count_before: int = Field(description="Physical line count before editor changes")
+    line_count_after: int = Field(description="Physical line count after normalization")
+    line_count_delta: int = Field(description="After-minus-before line-count delta for this pass")
+    missing_information_count: int = Field(
+        description="Total number of missing-information findings across all critics"
+    )
+    missing_information_delta: int | None = Field(
+        default=None,
+        description="Current missing-information count minus the previous pass count",
+    )
+    parent_notes: list[str] = Field(
+        default_factory=list,
+        description="Notes generated after this pass for the next editor pass",
+    )
+
+
+class ReductionLoopResult(BaseModel):
+    """Recorded outcome for the one-time end-of-run reduction stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_rules_path: str = Field(description="Rules document path consumed by the reduction stage")
+    pass_results: list[ReductionPassResult] = Field(
+        default_factory=list,
+        description="Ordered reduction passes",
+    )
+    output_artifact: RuleRefinementIterationArtifact = Field(
+        description="Final saved artifacts produced by the reduction stage",
+    )
+    final_line_count: int = Field(description="Final physical line count after reduction")
+    final_missing_information_count: int = Field(
+        description="Final aggregated missing-information count after reduction"
+    )
+
+
 class RuleRefinementIterationResult(BaseModel):
     """Full result for one iteration across all extracted rule sources."""
 
@@ -182,6 +264,15 @@ class RuleRefinementIterationResult(BaseModel):
     iteration_number: int = Field(description="1-based iteration number")
     input_rules_path: str = Field(
         description="Rules document consumed at the start of the iteration"
+    )
+    consolidation_suggestion: RuleUpdateSuggestions = Field(
+        description="Line updates returned by the iteration-level consolidation call",
+    )
+    consolidation_metrics: RuleRefinementCallMetrics = Field(
+        description="Metrics for the iteration-level consolidation call",
+    )
+    consolidation_artifact: RuleRefinementIterationArtifact = Field(
+        description="Saved artifacts produced by iteration-level consolidation",
     )
     output_artifact: RuleRefinementIterationArtifact = Field(
         description="Saved artifacts produced by this iteration",
@@ -211,4 +302,16 @@ class RuleRefinementRunResult(BaseModel):
     usage_totals: dict[str, int] = Field(
         default_factory=dict,
         description="Accumulated token usage across every rule refinement call",
+    )
+    cost_totals: dict[str, float] | None = Field(
+        default=None,
+        description="Accumulated estimated cost across every rule refinement call",
+    )
+    reduction: ReductionLoopResult | None = Field(
+        default=None,
+        description="One-time end-of-run reduction stage summary, if executed",
+    )
+    manifest_path: str | None = Field(
+        default=None,
+        description="Path to the persisted run manifest markdown file",
     )

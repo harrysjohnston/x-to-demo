@@ -15,22 +15,32 @@ _GPT52_REASONING_EFFORTS: tuple[str, ...] = ("none", "low", "medium", "high", "x
 _O_SERIES_REASONING_EFFORTS: tuple[str, ...] = ("low", "medium", "high")
 
 
+def _normalize_model_name(model_name: str) -> str:
+    """Normalize model names to a comparison-safe format."""
+    return str(model_name).strip().lower()
+
+
+def _is_o_series_model(normalized_name: str) -> bool:
+    """Return whether a normalized model name is an o-series variant."""
+    return len(normalized_name) >= 2 and normalized_name[0] == "o" and normalized_name[1].isdigit()
+
+
 def supports_reasoning(model_name: str) -> bool:
     """Return whether the model accepts reasoning-level controls."""
-    normalized_name = model_name.strip().lower()
+    normalized_name = _normalize_model_name(model_name)
     if normalized_name.startswith("gpt-5"):
         return True
-    return len(normalized_name) >= 2 and normalized_name[0] == "o" and normalized_name[1].isdigit()
+    return _is_o_series_model(normalized_name)
 
 
 def supported_reasoning_efforts(model_name: str) -> tuple[str, ...] | None:
     """Return model-specific supported reasoning efforts when known."""
-    normalized_name = model_name.strip().lower()
+    normalized_name = _normalize_model_name(model_name)
     if normalized_name.startswith("gpt-5.2"):
         return _GPT52_REASONING_EFFORTS
     if normalized_name.startswith("gpt-5"):
         return _GPT5_REASONING_EFFORTS
-    if len(normalized_name) >= 2 and normalized_name[0] == "o" and normalized_name[1].isdigit():
+    if _is_o_series_model(normalized_name):
         return _O_SERIES_REASONING_EFFORTS
     return None
 
@@ -47,7 +57,7 @@ def default_reasoning_effort(*, model_name: str) -> str:
 
 def validate_model_name(*, model_name: str) -> str:
     """Normalize and validate the selected X-to-Demo model."""
-    normalized_name = str(model_name).strip().lower()
+    normalized_name = _normalize_model_name(model_name)
     if not normalized_name:
         raise ValueError("model must be a non-empty string")
 

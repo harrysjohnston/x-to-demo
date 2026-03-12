@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenAI Images & Vision"
+  short_description: "Build image generation and vision flows"
+  default_prompt: "Use $openai-images-vision to implement OpenAI image generation, image editing, or vision input analysis with the correct API shape and limits."

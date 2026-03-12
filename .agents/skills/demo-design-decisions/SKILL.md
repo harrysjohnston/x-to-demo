@@ -1,6 +1,6 @@
 ---
 name: demo-design-decisions
-description: Canonical design decisions for x-to-demo: guardrails (server-side, relevance + safety verdicts), synthetic presets (UI-selectable, test-validated, every flow covered). Use when implementing or modifying demos, guardrails, or preset systems.
+description: "Canonical design decisions for x-to-demo: guardrails (server-side, relevance + safety verdicts), synthetic presets (UI-selectable, test-validated, every flow covered). Use when implementing or modifying demos, guardrails, or preset systems."
 ---
 
 # Demo Design Decisions

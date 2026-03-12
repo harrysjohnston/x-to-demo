@@ -11,7 +11,8 @@ Usage: scripts/bootstrap [--skip-install] [--skip-checks]
 Bootstraps local x-to-demo development:
   1) Creates .env from config/env.example if missing
   2) Installs workspace dependencies
-  3) Runs lint/typecheck/tests unless skipped
+  3) Installs Playwright CLI and relocates installed browser skills into .agents/skills
+  4) Runs lint/typecheck/tests unless skipped
 USAGE
 }
 
@@ -50,6 +51,13 @@ fi
 if [[ "$SKIP_INSTALL" == "false" ]]; then
   pnpm install
   uv sync --project apps/api --extra dev
+  npm install -g @playwright/cli@latest
+  playwright-cli install --skills
+  if [[ -d .claude/skills ]]; then
+    mkdir -p .agents/skills
+    cp -R .claude/skills/. .agents/skills/
+    rm -rf .claude/skills
+  fi
 fi
 
 if [[ "$SKIP_CHECKS" == "false" ]]; then

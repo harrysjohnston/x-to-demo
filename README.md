@@ -2,15 +2,19 @@
 
 `x-to-demo` turns raw Input X into structured specifications through a three-phase pipeline (feature spec → demo spec → code spec).
 
-**Prerequisites:** Docker (for `pnpm dev`), or Node/pnpm + Python/uv for running without Docker.
+**Prerequisites:** Docker (for `pnpm dev`), or Node/pnpm + Python/uv for running without Docker. `pnpm setup` also uses `npm` to install `@playwright/cli` globally.
 
 ## Quick start
 
-1. Create env file (or run `./scripts/bootstrap` for full setup):
+1. Run the repo setup script:
 
 ```bash
-cp config/env.example .env
+pnpm setup
 ```
+
+This creates `.env` from `config/env.example` if needed, installs workspace dependencies, installs `@playwright/cli`, runs `playwright-cli install --skills`, and moves any installed skills from `./.claude/skills` into `./.agents/skills`.
+
+Use `pnpm setup -- --skip-checks` if you want the install steps without lint/typecheck/test on first run.
 
 2. Set your OpenAI key in `.env`:
 

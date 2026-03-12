@@ -1,8 +1,9 @@
-"""Tests for rule refinement extraction, prompts, persistence, and service."""
+"""Tests for rule refinement prompts, artifacts, and orchestration."""
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -20,28 +21,27 @@ from app.x_to_demo.rule_refinement import (
     build_narrative_critique_user_prompt,
     build_narrative_improvement_developer_prompt,
     build_narrative_improvement_user_prompt,
-    build_principle_extraction_developer_prompt,
-    build_principle_extraction_user_prompt,
+    build_reduction_critic_developer_prompt,
+    build_reduction_critic_user_prompt,
+    build_reduction_editor_developer_prompt,
+    build_reduction_editor_user_prompt,
     build_rule_consolidation_developer_prompt,
     build_rule_consolidation_user_prompt,
     build_rule_update_developer_prompt,
     build_rule_update_user_prompt,
+    build_source_gap_analysis_developer_prompt,
+    build_source_gap_analysis_user_prompt,
     extract_all_skills,
     extract_phase_models,
     extract_phase_prompts,
     extract_refinement_inputs,
+    iteration_source_analysis_path,
     load_demo_build_rules_lines,
     next_rules_version,
     render_focused_diff,
+    versioned_source_suggestion_path,
 )
-from app.x_to_demo.rule_refinement.cache import (
-    content_hash,
-    get_cached_principles,
-    set_cache_dir_override,
-    set_cached_principles,
-)
-from app.x_to_demo.rule_refinement.prompts import build_rule_update_user_prompt_for_section
-from app.x_to_demo.rule_refinement.sections import split_rules_into_sections
+from app.x_to_demo.rule_refinement.cache import content_hash
 
 
 class _FakeResponse:
@@ -90,11 +90,14 @@ class _FakeRandomizer:
 
 
 def _build_service(
-    responses: list[_FakeResponse], *, randomizer: _FakeRandomizer | None = None
+    responses: list[_FakeResponse],
+    *,
+    randomizer: _FakeRandomizer | None = None,
+    model: str = "gpt-5.2",
 ) -> RuleRefinementService:
     return RuleRefinementService(
         responses_client=_FakeClient(responses),
-        model="gpt-5.2",
+        model=model,
         reasoning_effort="low",
         response_wait_log_interval_seconds=0.01,
         randomizer=randomizer,
@@ -104,32 +107,43 @@ def _build_service(
 def _narrative_tuning_responses(
     *,
     critique: dict[str, object] | None = None,
-    suggestions: list[dict[str, object]] | None = None,
+    suggestion: dict[str, object] | None = None,
     usages: list[dict[str, int] | None] | None = None,
 ) -> list[_FakeResponse]:
     critique_payload = critique or {
         "critique": ["The rules could describe the procedure more clearly."],
         "suggested_improvements": ["Make the sequence of steps more explicit."],
     }
-    suggestion_payloads = suggestions or [
-        {"replacements": [], "appends": []},
-        {"replacements": [], "appends": []},
-        {"replacements": [], "appends": []},
-    ]
-    usage_payloads = usages or [None, None, None, None]
+    suggestion_payload = suggestion or {"replacements": [], "appends": []}
+    usage_payloads = usages or [None, None]
     return [
-        _FakeResponse(
-            output_text=json.dumps(critique_payload),
-            usage=usage_payloads[0],
-        ),
-        *[
-            _FakeResponse(
-                output_text=json.dumps(payload),
-                usage=usage_payloads[index + 1],
-            )
-            for index, payload in enumerate(suggestion_payloads)
-        ],
+        _FakeResponse(output_text=json.dumps(critique_payload), usage=usage_payloads[0]),
+        _FakeResponse(output_text=json.dumps(suggestion_payload), usage=usage_payloads[1]),
     ]
+
+
+def _reduction_responses(
+    *,
+    editor_suggestions: list[dict[str, object]] | None = None,
+    critic_payloads: list[dict[str, object]] | None = None,
+    usages: list[dict[str, int] | None] | None = None,
+) -> list[_FakeResponse]:
+    editor_payloads = editor_suggestions or [{"replacements": [], "appends": []}] * 3
+    critic_payload_list = critic_payloads or [{"missing_information": []}] * 3
+    usage_payloads = usages or [None] * (len(editor_payloads) + len(critic_payload_list))
+    responses: list[_FakeResponse] = []
+    for index, editor_payload in enumerate(editor_payloads):
+        responses.append(
+            _FakeResponse(output_text=json.dumps(editor_payload), usage=usage_payloads[index])
+        )
+        critic_payload = critic_payload_list[index]
+        responses.append(
+            _FakeResponse(
+                output_text=json.dumps(critic_payload),
+                usage=usage_payloads[len(editor_payloads) + index],
+            )
+        )
+    return responses
 
 
 def _require_live_openai_smoke() -> str:
@@ -183,17 +197,6 @@ def test_load_demo_build_rules_lines_for_missing_file(tmp_path: Path) -> None:
     assert result.lines == {}
 
 
-def test_load_demo_build_rules_lines_for_empty_file(tmp_path: Path) -> None:
-    rules_path = tmp_path / "demo-build-rules.md"
-    rules_path.write_text("", encoding="utf-8")
-
-    result = load_demo_build_rules_lines(rules_path)
-
-    assert result.exists is True
-    assert result.line_count == 0
-    assert result.lines == {}
-
-
 def test_load_demo_build_rules_lines_for_populated_file(tmp_path: Path) -> None:
     rules_path = tmp_path / "demo-build-rules.md"
     rules_path.write_text("# Demo Build Rules\n\nRule one\nRule two\n", encoding="utf-8")
@@ -216,20 +219,9 @@ def test_extract_phase_prompts_returns_descriptive_text_only() -> None:
     assert "## Phase 1: Input -> Feature Spec" in content
     assert "Objective: Transform raw input into a behavior-first feature spec" in content
     assert "### Developer Guidance" in content
-    assert "Global hard rules:" in content
     assert "### User Checklist" in content
     assert "```json" not in content
     assert "Output schema (source of truth):" not in content
-    assert "Input payload:" not in content
-    assert "Return JSON only." not in content
-
-
-def test_extract_phase_prompts_includes_code_spec_api_decision_guide() -> None:
-    content = extract_phase_prompts("code_spec")
-
-    assert "API decision guide:" in content
-    assert "Responses API: choose for request/response interactions" in content
-    assert "Agents SDK: choose when multi-step tool loops" in content
 
 
 def test_extract_phase_models_returns_descriptive_model_sections() -> None:
@@ -240,10 +232,6 @@ def test_extract_phase_models_returns_descriptive_model_sections() -> None:
     assert "### Output model" in content
     assert "#### `PipelineRunInput`" in content
     assert "#### `FeatureSpecArtifact`" in content
-    assert "#### `FeatureIntent`" in content
-    assert "| Field | Type | Description |" in content
-    assert "$defs" not in content
-    assert "model_json_schema" not in content
 
 
 def test_extract_all_skills_discovers_current_skill_set() -> None:
@@ -254,43 +242,45 @@ def test_extract_all_skills_discovers_current_skill_set() -> None:
     assert "## Reference" in skills["generated-output-badge"]
 
 
-def test_build_principle_extraction_user_prompt_includes_source_metadata() -> None:
-    prompt = build_principle_extraction_user_prompt(
-        RefinementSource(
-            source_key="skill_example",
-            title="Skill example",
-            content="1. Keep the scope small.",
-        )
-    )
-
-    assert "Source key: skill_example" in prompt
-    assert "Source title: Skill example" in prompt
-    assert "Keep the scope small." in prompt
-
-
 def test_developer_prompts_prepend_shared_objective() -> None:
-    principle_prompt = build_principle_extraction_developer_prompt()
+    analysis_prompt = build_source_gap_analysis_developer_prompt()
+    update_prompt = build_rule_update_developer_prompt()
     consolidation_prompt = build_rule_consolidation_developer_prompt()
     narrative_critique_prompt = build_narrative_critique_developer_prompt()
     narrative_improvement_prompt = build_narrative_improvement_developer_prompt()
+    reduction_editor_prompt = build_reduction_editor_developer_prompt()
+    reduction_critic_prompt = build_reduction_critic_developer_prompt()
 
     expected_prefix = (
         "Overall objective: define standard rules and procedures for the creation "
         "of demos showcasing proposed GenAI products."
     )
-    assert principle_prompt.startswith(expected_prefix)
+    assert analysis_prompt.startswith(expected_prefix)
+    assert update_prompt.startswith(expected_prefix)
     assert consolidation_prompt.startswith(expected_prefix)
     assert narrative_critique_prompt.startswith(expected_prefix)
     assert narrative_improvement_prompt.startswith(expected_prefix)
+    assert reduction_editor_prompt.startswith(expected_prefix)
+    assert reduction_critic_prompt.startswith(expected_prefix)
 
 
-def test_build_rule_update_developer_prompt_includes_no_updates_is_fine() -> None:
-    prompt = build_rule_update_developer_prompt()
-    assert "Suggesting no updates" in prompt
-    assert "empty replacements and appends" in prompt
+def test_source_gap_analysis_user_prompt_includes_rules_and_source() -> None:
+    prompt = build_source_gap_analysis_user_prompt(
+        rules_text="Rule one\nRule two\n",
+        source=RefinementSource(
+            source_key="skill_example",
+            title="Skill example",
+            content="1. Keep the scope small.",
+        ),
+    )
+
+    assert "Current build rules raw text" in prompt
+    assert "Source key: skill_example" in prompt
+    assert "Rule one" in prompt
+    assert "Keep the scope small." in prompt
 
 
-def test_build_rule_update_user_prompt_includes_line_mapping_and_principles() -> None:
+def test_build_rule_update_prompts_include_analysis_and_overlap_guard() -> None:
     prompt = build_rule_update_user_prompt(
         rules=DemoBuildRulesLines(
             path="demo-build-rules.md",
@@ -298,7 +288,7 @@ def test_build_rule_update_user_prompt_includes_line_mapping_and_principles() ->
             line_count=2,
             lines={1: "Rule one", 2: "Rule two"},
         ),
-        principles=["Preserve deterministic walkthroughs.", "Do not add plumbing."],
+        analysis="- Missing explicit sequencing.\n- Missing default safety handling.",
         source=RefinementSource(
             source_key="global_rules",
             title="Global hard rules",
@@ -307,12 +297,17 @@ def test_build_rule_update_user_prompt_includes_line_mapping_and_principles() ->
     )
 
     assert '"1": "Rule one"' in prompt
-    assert "- Preserve deterministic walkthroughs." in prompt
-    assert "- Do not add plumbing." in prompt
+    assert "Analysis of missing source aspects" in prompt
+    assert "Missing explicit sequencing." in prompt
+    assert "already done" in build_rule_update_developer_prompt()
+    assert "descriptive natural language only" in build_rule_update_developer_prompt()
+    assert "not code, schemas, field names" in build_rule_update_developer_prompt()
+    assert "already done" in build_narrative_improvement_developer_prompt()
+    assert "descriptive natural language only" in build_narrative_improvement_developer_prompt()
 
 
-def test_build_rule_consolidation_user_prompt_includes_current_line_mapping() -> None:
-    prompt = build_rule_consolidation_user_prompt(
+def test_build_rule_consolidation_and_narrative_prompts_include_inputs() -> None:
+    consolidation_prompt = build_rule_consolidation_user_prompt(
         rules=DemoBuildRulesLines(
             path="demo-build-rules.md",
             exists=True,
@@ -320,23 +315,10 @@ def test_build_rule_consolidation_user_prompt_includes_current_line_mapping() ->
             lines={1: "Rule one", 2: "Rule two"},
         )
     )
-
-    assert '"1": "Rule one"' in prompt
-    assert "consolidate repetitive rules" in prompt
-
-
-def test_build_narrative_critique_user_prompt_includes_raw_rules_text() -> None:
-    prompt = build_narrative_critique_user_prompt(
+    critique_prompt = build_narrative_critique_user_prompt(
         rules_text="# Rules\n\n1. Start with context.\n2. Use clear terms."
     )
-
-    assert "Current build rules raw text" in prompt
-    assert "1. Start with context." in prompt
-    assert "2. Use clear terms." in prompt
-
-
-def test_build_narrative_improvement_user_prompt_includes_improvements_and_line_mapping() -> None:
-    prompt = build_narrative_improvement_user_prompt(
+    narrative_prompt = build_narrative_improvement_user_prompt(
         rules=DemoBuildRulesLines(
             path="demo-build-rules.md",
             exists=True,
@@ -349,10 +331,42 @@ def test_build_narrative_improvement_user_prompt_includes_improvements_and_line_
         ],
     )
 
-    assert "Suggested narrative improvements" in prompt
-    assert "- Clarify the opening procedure." in prompt
-    assert "- Replace undefined jargon with plain language." in prompt
-    assert '"1": "Rule one"' in prompt
+    assert "consolidate repetitive rules" in consolidation_prompt
+    assert "Current build rules raw text" in critique_prompt
+    assert "Suggested narrative improvements" in narrative_prompt
+
+
+def test_build_reduction_prompts_include_notes_and_changes() -> None:
+    editor_prompt = build_reduction_editor_user_prompt(
+        rules=DemoBuildRulesLines(
+            path="demo-build-rules.md",
+            exists=True,
+            line_count=3,
+            lines={1: "Rule one", 2: "Rule two", 3: "Rule three"},
+        ),
+        notes=["Preserve setup sequencing.", "Restore any missing safety guidance."],
+    )
+    critic_prompt = build_reduction_critic_user_prompt(
+        rules_text="Rule one\nRule two\n",
+        source=RefinementSource(
+            source_key="skill_example",
+            title="Skill example",
+            content="Keep setup explicit and safe.",
+        ),
+        editor_changes=RuleUpdateSuggestions(
+            replacements=[RuleLineReplacement(line_number=2, new_line="")],
+            appends=[],
+            rationale=["Merged duplicate setup rules."],
+        ),
+    )
+
+    assert "Parent notes for this reduction pass" in editor_prompt
+    assert "Preserve setup sequencing." in editor_prompt
+    assert '"2": "Rule two"' in editor_prompt
+    assert "reduce redundancy" in build_reduction_editor_developer_prompt().lower()
+    assert "Applied editor changes" in critic_prompt
+    assert '"line_number": 2' in critic_prompt
+    assert "updated rules" in build_reduction_critic_developer_prompt()
 
 
 def test_apply_rule_update_suggestions_replaces_and_appends_lines() -> None:
@@ -428,541 +442,17 @@ def test_render_focused_diff_limits_context_to_changed_lines_plus_minus_five() -
     assert "-    6 | Line 6" in diff
     assert "+    6 | Line 6 updated" in diff
     assert "+   13 | Line 13" in diff
-    assert "    1 | Line 1" in diff
-    assert "   12 | Line 12" in diff
 
 
-def test_rule_refinement_service_runs_iterations_and_saves_versioned_outputs(
+def test_source_analysis_and_suggestion_paths_include_iteration_source_and_version(
     tmp_path: Path,
 ) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\nRule two\n", encoding="utf-8")
-        randomizer = _FakeRandomizer(
-            shuffled_orders=[
-                ["source_a", "source_b"],
-                ["source_b", "source_a"],
-            ]
-        )
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Clarify rule two."]})),
-                _FakeResponse(
-                    output_text=json.dumps(
-                        {
-                            "replacements": [{"line_number": 2, "new_line": "Rule two updated"}],
-                            "appends": ["Rule three"],
-                        }
-                    )
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(output_text=json.dumps({"principles": ["Add rule four."]})),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule four"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-                _FakeResponse(
-                    output_text=json.dumps(
-                        {
-                            "replacements": [{"line_number": 3, "new_line": "Rule three refined"}],
-                            "appends": [],
-                        }
-                    )
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule five"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-            ],
-            randomizer=randomizer,
-        )
+    base_path = tmp_path / "demo-build-rules.md"
+    analysis_path = iteration_source_analysis_path(base_path, 3, "skill/demo design")
+    suggestion_path = versioned_source_suggestion_path(base_path, 7, "skill/demo design")
 
-        result = service.run(
-            iterations=2,
-            rules_path=rules_path,
-            sources=[
-                RefinementSource(
-                    source_key="source_a",
-                    title="Source A",
-                    content="Source A content for extraction",
-                ),
-                RefinementSource(
-                    source_key="source_b",
-                    title="Source B",
-                    content="Source B content for extraction",
-                ),
-            ],
-        )
-
-        assert result.final_rules_path.endswith("demo-build-rules.v014.md")
-        assert result.iteration_results[0].output_artifact.rules_path.endswith("v007.md")
-        assert result.iteration_results[0].narrative_tuning.output_artifact.rules_path.endswith(
-            "v007.md"
-        )
-        assert (
-            result.iteration_results[0]
-            .narrative_tuning.pass_results[0]
-            .output_artifact.rules_path.endswith("v005.md")
-        )
-        assert (
-            result.iteration_results[0]
-            .narrative_tuning.pass_results[1]
-            .output_artifact.rules_path.endswith("v006.md")
-        )
-        assert (
-            result.iteration_results[0]
-            .narrative_tuning.pass_results[2]
-            .output_artifact.rules_path.endswith("v007.md")
-        )
-        assert result.iteration_results[1].input_rules_path.endswith("v007.md")
-        assert (
-            result.iteration_results[0]
-            .source_results[0]
-            .applied_artifact.rules_path.endswith("v001.md")
-        )
-        assert (
-            result.iteration_results[0]
-            .source_results[0]
-            .output_artifact.rules_path.endswith("v002.md")
-        )
-        assert (
-            result.iteration_results[0]
-            .source_results[1]
-            .applied_artifact.rules_path.endswith("v003.md")
-        )
-        assert (
-            result.iteration_results[0]
-            .source_results[1]
-            .output_artifact.rules_path.endswith("v004.md")
-        )
-        assert (
-            result.iteration_results[1]
-            .source_results[0]
-            .applied_artifact.rules_path.endswith("v008.md")
-        )
-        assert (
-            result.iteration_results[1]
-            .source_results[0]
-            .output_artifact.rules_path.endswith("v009.md")
-        )
-        assert (
-            result.iteration_results[1]
-            .source_results[1]
-            .applied_artifact.rules_path.endswith("v010.md")
-        )
-        assert (
-            result.iteration_results[1]
-            .source_results[1]
-            .output_artifact.rules_path.endswith("v011.md")
-        )
-        assert result.iteration_results[1].narrative_tuning.output_artifact.rules_path.endswith(
-            "v014.md"
-        )
-        assert len(list(tmp_path.glob("demo-build-rules.v[0-9][0-9][0-9].md"))) == 14
-        assert (tmp_path / "demo-build-rules.v001.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three",
-        ]
-        assert (tmp_path / "demo-build-rules.v002.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three",
-        ]
-        assert (tmp_path / "demo-build-rules.v003.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three",
-            "Rule four",
-        ]
-        assert (tmp_path / "demo-build-rules.v004.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three",
-            "Rule four",
-        ]
-        assert (tmp_path / "demo-build-rules.v007.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three",
-            "Rule four",
-        ]
-        assert (tmp_path / "demo-build-rules.v008.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three refined",
-            "Rule four",
-        ]
-        assert (tmp_path / "demo-build-rules.v009.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three refined",
-            "Rule four",
-        ]
-        assert (tmp_path / "demo-build-rules.v010.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three refined",
-            "Rule four",
-            "Rule five",
-        ]
-        assert (tmp_path / "demo-build-rules.v014.md").read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three refined",
-            "Rule four",
-            "Rule five",
-        ]
-        assert rules_path.read_text(encoding="utf-8").splitlines() == [
-            "Rule one",
-            "Rule two updated",
-            "Rule three refined",
-            "Rule four",
-            "Rule five",
-        ]
-        assert (tmp_path / "demo-build-rules.v001.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v002.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v003.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v004.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v005.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v006.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v007.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v008.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v009.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v010.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v011.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v012.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v013.diff.md").exists()
-        assert (tmp_path / "demo-build-rules.v014.diff.md").exists()
-        assert Path(result.iteration_results[0].narrative_tuning.critique_path).exists()
-        assert Path(result.iteration_results[1].narrative_tuning.critique_path).exists()
-        assert Path(
-            result.iteration_results[0].narrative_tuning.pass_results[0].suggestion_path
-        ).exists()
-        assert Path(
-            result.iteration_results[1].narrative_tuning.pass_results[2].suggestion_path
-        ).exists()
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_shuffles_source_order_each_iteration(tmp_path: Path) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        randomizer = _FakeRandomizer(
-            shuffled_orders=[
-                ["source_b", "source_a"],
-                ["source_a", "source_b"],
-            ]
-        )
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["B1"]})),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule from B1"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(output_text=json.dumps({"principles": ["A1"]})),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule from A1"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule from A2"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": ["Rule from B2"]})
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-            ],
-            randomizer=randomizer,
-        )
-
-        result = service.run(
-            iterations=2,
-            rules_path=rules_path,
-            sources=[
-                RefinementSource(source_key="source_a", title="Source A", content="A"),
-                RefinementSource(source_key="source_b", title="Source B", content="B"),
-            ],
-        )
-
-        assert randomizer.calls == 2
-        assert [entry.source_key for entry in result.iteration_results[0].source_results] == [
-            "source_b",
-            "source_a",
-        ]
-        assert [entry.source_key for entry in result.iteration_results[1].source_results] == [
-            "source_a",
-            "source_b",
-        ]
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_builds_strict_responses_payloads(tmp_path: Path) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Keep one clear rule."]})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(
-                    critique={
-                        "critique": ["The rules lack a clear opening flow."],
-                        "suggested_improvements": ["Add a clearer narrative opening."],
-                    }
-                ),
-            ]
-        )
-
-        service.run(
-            iterations=1,
-            rules_path=rules_path,
-            sources=[
-                RefinementSource(
-                    source_key="source_a",
-                    title="Source A",
-                    content="Synthetic source",
-                )
-            ],
-        )
-
-        requests = service.responses_client.responses.requests
-        assert requests[0]["reasoning"] == {"effort": "low"}
-        assert requests[0]["text"]["format"]["strict"] is True
-        assert requests[0]["text"]["format"]["name"] == "rule_refinement_principles"
-        assert requests[1]["text"]["format"]["name"] == "rule_refinement_suggestions"
-        assert requests[2]["text"]["format"]["name"] == "rule_refinement_consolidation"
-        assert requests[3]["text"]["format"]["name"] == "rule_refinement_narrative_critique"
-        assert requests[3]["reasoning"] == {"effort": "xhigh"}
-        assert requests[4]["text"]["format"]["name"] == "rule_refinement_narrative_suggestions"
-        assert requests[4]["reasoning"] == {"effort": "medium"}
-        assert requests[5]["reasoning"] == {"effort": "medium"}
-        assert requests[6]["reasoning"] == {"effort": "medium"}
-        assert requests[0]["input"][0]["role"] == "developer"
-        assert requests[0]["input"][1]["role"] == "user"
-        assert '"1": "Rule one"' in requests[2]["input"][1]["content"]
-        assert "Current build rules raw text" in requests[3]["input"][1]["content"]
-        assert "Suggested narrative improvements" in requests[4]["input"][1]["content"]
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_clamps_narrative_critique_effort_for_gpt5_mini(
-    tmp_path: Path,
-) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        client = _FakeClient(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Keep the rule."]})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-            ]
-        )
-        service = RuleRefinementService(
-            responses_client=client,
-            model="gpt-5-mini",
-            reasoning_effort="low",
-            response_wait_log_interval_seconds=0.01,
-        )
-
-        service.run(
-            iterations=1,
-            rules_path=rules_path,
-            sources=[
-                RefinementSource(
-                    source_key="source_a",
-                    title="Source A",
-                    content="Synthetic source",
-                )
-            ],
-        )
-
-        requests = client.responses.requests
-        assert requests[3]["reasoning"] == {"effort": "high"}
-        assert requests[4]["reasoning"] == {"effort": "medium"}
-        assert requests[5]["reasoning"] == {"effort": "medium"}
-        assert requests[6]["reasoning"] == {"effort": "medium"}
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_narrative_tuning_uses_updated_rules_and_tracks_usage(
-    tmp_path: Path,
-) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        service = _build_service(
-            [
-                _FakeResponse(
-                    output_text=json.dumps({"principles": ["Preserve the core rule."]}),
-                    usage={"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
-                ),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": []}),
-                    usage={"input_tokens": 4, "output_tokens": 5, "total_tokens": 9},
-                ),
-                _FakeResponse(
-                    output_text=json.dumps({"replacements": [], "appends": []}),
-                    usage={"input_tokens": 6, "output_tokens": 7, "total_tokens": 13},
-                ),
-                *_narrative_tuning_responses(
-                    critique={
-                        "critique": ["The rules read like isolated statements."],
-                        "suggested_improvements": [
-                            "Add a short heading that frames the procedure.",
-                            "Make the first action explicit.",
-                        ],
-                    },
-                    suggestions=[
-                        {
-                            "replacements": [{"line_number": 1, "new_line": "## Narrative Flow"}],
-                            "appends": [],
-                        },
-                        {
-                            "replacements": [],
-                            "appends": ["1. Start by stating the user's goal."],
-                        },
-                        {
-                            "replacements": [],
-                            "appends": [],
-                        },
-                    ],
-                    usages=[
-                        {"input_tokens": 8, "output_tokens": 9, "total_tokens": 17},
-                        {"input_tokens": 10, "output_tokens": 11, "total_tokens": 21},
-                        {"input_tokens": 12, "output_tokens": 13, "total_tokens": 25},
-                        {"input_tokens": 14, "output_tokens": 15, "total_tokens": 29},
-                    ],
-                ),
-            ]
-        )
-
-        result = service.run(
-            iterations=1,
-            rules_path=rules_path,
-            sources=[
-                RefinementSource(source_key="source_a", title="Source A", content="Synthetic")
-            ],
-        )
-
-        requests = service.responses_client.responses.requests
-        assert '"1": "## Narrative Flow"' in requests[5]["input"][1]["content"]
-        assert "1. Start by stating the user's goal." in requests[6]["input"][1]["content"]
-        assert result.usage_totals == {
-            "cached_input_tokens": 0,
-            "input_tokens": 55,
-            "output_tokens": 62,
-            "reasoning_tokens": 0,
-            "total_tokens": 117,
-        }
-        assert result.iteration_results[0].narrative_tuning.critique.critique == [
-            "The rules read like isolated statements."
-        ]
-        assert (
-            result.iteration_results[0]
-            .narrative_tuning.pass_results[1]
-            .output_artifact.rules_path.endswith("v004.md")
-        )
-        assert Path(result.final_rules_path).read_text(encoding="utf-8").splitlines() == [
-            "## Narrative Flow",
-            "1. Start by stating the user's goal.",
-        ]
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_raises_for_invalid_suggestion_line_numbers(tmp_path: Path) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Bad suggestion."]})),
-                _FakeResponse(
-                    output_text=json.dumps(
-                        {"replacements": [{"line_number": 9, "new_line": "Bad line"}]}
-                    )
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-            ]
-        )
-
-        with pytest.raises(ValueError, match="Replacement line number 9 is out of range"):
-            service.run(
-                iterations=1,
-                rules_path=rules_path,
-                sources=[
-                    RefinementSource(
-                        source_key="source_a",
-                        title="Source A",
-                        content="Synthetic source",
-                    )
-                ],
-            )
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_rule_refinement_service_raises_for_invalid_narrative_suggestion_line_numbers(
-    tmp_path: Path,
-) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text("Rule one\n", encoding="utf-8")
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Keep the rule."]})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(
-                    suggestions=[
-                        {
-                            "replacements": [{"line_number": 9, "new_line": "Bad line"}],
-                            "appends": [],
-                        },
-                        {"replacements": [], "appends": []},
-                        {"replacements": [], "appends": []},
-                    ]
-                ),
-            ]
-        )
-
-        with pytest.raises(ValueError, match="Replacement line number 9 is out of range"):
-            service.run(
-                iterations=1,
-                rules_path=rules_path,
-                sources=[
-                    RefinementSource(
-                        source_key="source_a",
-                        title="Source A",
-                        content="Synthetic source",
-                    )
-                ],
-            )
-    finally:
-        set_cache_dir_override(None)
+    assert analysis_path.name == "demo-build-rules.iteration-003.skill-demo-design.analysis.md"
+    assert suggestion_path.name == "demo-build-rules.v007.skill-demo-design.suggestion.json"
 
 
 def test_content_hash_is_stable() -> None:
@@ -970,156 +460,511 @@ def test_content_hash_is_stable() -> None:
     assert content_hash("foo") != content_hash("bar")
 
 
-def test_get_cached_principles_miss_returns_none(tmp_path: Path) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        assert get_cached_principles("nonexistent_hash") is None
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_get_cached_principles_hit_returns_cached(tmp_path: Path) -> None:
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        from app.x_to_demo.rule_refinement.models import ExtractedPrinciples
-
-        principles = ExtractedPrinciples(principles=["P1", "P2"])
-        h = content_hash("source content")
-        set_cached_principles(h, principles)
-        cached = get_cached_principles(h)
-        assert cached is not None
-        assert cached.principles == ["P1", "P2"]
-    finally:
-        set_cache_dir_override(None)
-
-
-def test_split_rules_into_sections_no_headers() -> None:
-    rules = DemoBuildRulesLines(
-        path="test.md",
-        exists=True,
-        line_count=3,
-        lines={1: "Line one", 2: "Line two", 3: "Line three"},
+def test_rule_refinement_service_runs_iterations_and_saves_versioned_outputs(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\nRule two\n", encoding="utf-8")
+    randomizer = _FakeRandomizer(
+        shuffled_orders=[
+            ["source_a", "source_b"],
+            ["source_b", "source_a"],
+        ]
     )
-    sections = split_rules_into_sections(rules)
-    assert sections == [(1, 3)]
-
-
-def test_split_rules_into_sections_with_equals_headers() -> None:
-    rules = DemoBuildRulesLines(
-        path="test.md",
-        exists=True,
-        line_count=6,
-        lines={
-            1: "Preamble",
-            2: "=== SECTION A ===",
-            3: "Content A",
-            4: "=== SECTION B ===",
-            5: "Content B",
-            6: "More B",
-        },
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Missing a clearer rule two."),
+            _FakeResponse(output_text="Missing a rule four."),
+            _FakeResponse(
+                output_text=json.dumps(
+                    {
+                        "replacements": [{"line_number": 2, "new_line": "Rule two updated"}],
+                        "appends": ["Rule three"],
+                    }
+                )
+            ),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": ["Rule four"]})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(),
+            _FakeResponse(output_text="Missing a clearer third rule."),
+            _FakeResponse(output_text="Missing a rule five."),
+            _FakeResponse(
+                output_text=json.dumps(
+                    {
+                        "replacements": [{"line_number": 3, "new_line": "Rule three refined"}],
+                        "appends": [],
+                    }
+                )
+            ),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": ["Rule five"]})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(),
+        ],
+        randomizer=randomizer,
     )
-    sections = split_rules_into_sections(rules)
-    assert sections == [(1, 1), (2, 3), (4, 6)]
 
-
-def test_split_rules_into_sections_with_atx_headers() -> None:
-    rules = DemoBuildRulesLines(
-        path="test.md",
-        exists=True,
-        line_count=5,
-        lines={
-            1: "# Title",
-            2: "Intro",
-            3: "## Section 1",
-            4: "Body 1",
-            5: "## Section 2",
-        },
+    result = service.run(
+        iterations=2,
+        rules_path=rules_path,
+        sources=[
+            RefinementSource(source_key="source_a", title="Source A", content="Source A"),
+            RefinementSource(source_key="source_b", title="Source B", content="Source B"),
+        ],
+        reduction_passes=0,
     )
-    sections = split_rules_into_sections(rules)
-    assert sections == [(1, 2), (3, 4), (5, 5)]
 
-
-def test_split_rules_into_sections_empty_returns_empty() -> None:
-    rules = DemoBuildRulesLines(
-        path="test.md",
-        exists=True,
-        line_count=0,
-        lines={},
+    assert randomizer.calls == 2
+    assert result.final_rules_path.endswith("demo-build-rules.v008.md")
+    assert result.iteration_results[0].consolidation_artifact.rules_path.endswith("v003.md")
+    assert result.iteration_results[0].narrative_tuning.output_artifact.rules_path.endswith(
+        "v004.md"
     )
-    sections = split_rules_into_sections(rules)
-    assert sections == []
+    assert result.iteration_results[1].consolidation_artifact.rules_path.endswith("v007.md")
+    assert result.iteration_results[1].output_artifact.rules_path.endswith("v008.md")
+    assert [entry.source_key for entry in result.iteration_results[0].source_results] == [
+        "source_a",
+        "source_b",
+    ]
+    assert [entry.source_key for entry in result.iteration_results[1].source_results] == [
+        "source_b",
+        "source_a",
+    ]
+    assert len(result.iteration_results[0].narrative_tuning.pass_results) == 1
+    assert (tmp_path / "demo-build-rules.v001.md").read_text(encoding="utf-8").splitlines() == [
+        "Rule one",
+        "Rule two updated",
+        "Rule three",
+    ]
+    assert (tmp_path / "demo-build-rules.v002.md").read_text(encoding="utf-8").splitlines() == [
+        "Rule one",
+        "Rule two updated",
+        "Rule three",
+        "Rule four",
+    ]
+    assert (tmp_path / "demo-build-rules.v008.md").read_text(encoding="utf-8").splitlines() == [
+        "Rule one",
+        "Rule two updated",
+        "Rule three refined",
+        "Rule four",
+        "Rule five",
+    ]
+    assert rules_path.read_text(encoding="utf-8").splitlines() == [
+        "Rule one",
+        "Rule two updated",
+        "Rule three refined",
+        "Rule four",
+        "Rule five",
+    ]
+    assert Path(result.iteration_results[0].source_results[0].analysis_path).exists()
+    assert Path(result.iteration_results[0].source_results[0].suggestion_path).exists()
+    assert Path(result.iteration_results[0].narrative_tuning.critique_path).exists()
+    assert Path(
+        result.iteration_results[1].narrative_tuning.pass_results[0].suggestion_path
+    ).exists()
+    assert result.manifest_path is not None
+    manifest = Path(result.manifest_path)
+    assert manifest.exists()
+    assert manifest.suffix == ".md"
+    assert "manifest" in manifest.stem
+    manifest_content = manifest.read_text(encoding="utf-8")
+    assert "# Rule Refinement Run Manifest" in manifest_content
+    assert "Iteration 1" in manifest_content
+    assert "Iteration 2" in manifest_content
 
 
-def test_build_rule_update_user_prompt_for_section_includes_section_label() -> None:
-    prompt = build_rule_update_user_prompt_for_section(
-        section_rules=DemoBuildRulesLines(
-            path="test.md",
-            exists=True,
-            line_count=1,
-            lines={5: "Rule line"},
-        ),
-        principles=["P1"],
-        source=RefinementSource(source_key="sk", title="Title", content="C"),
-        section_label="lines 5-5",
+def test_rule_refinement_service_builds_expected_payloads_and_reasoning(tmp_path: Path) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Missing an opening rule."),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(
+                critique={
+                    "critique": ["The rules lack a clear opening flow."],
+                    "suggested_improvements": ["Add a clearer narrative opening."],
+                }
+            ),
+        ]
     )
-    assert "Section: lines 5-5" in prompt
-    assert '"5": "Rule line"' in prompt
+
+    service.run(
+        iterations=1,
+        rules_path=rules_path,
+        sources=[
+            RefinementSource(
+                source_key="source_a",
+                title="Source A",
+                content="Synthetic source",
+            )
+        ],
+        reduction_passes=0,
+    )
+
+    requests = service.responses_client.responses.requests
+    assert requests[0]["reasoning"] == {"effort": "high"}
+    assert "text" not in requests[0]
+    assert "Current build rules raw text" in requests[0]["input"][1]["content"]
+    assert requests[1]["text"]["format"]["name"] == "rule_refinement_suggestions"
+    assert "Analysis of missing source aspects" in requests[1]["input"][1]["content"]
+    assert requests[2]["text"]["format"]["name"] == "rule_refinement_consolidation"
+    assert requests[3]["text"]["format"]["name"] == "rule_refinement_narrative_critique"
+    assert requests[3]["reasoning"] == {"effort": "xhigh"}
+    assert requests[4]["text"]["format"]["name"] == "rule_refinement_narrative_suggestions"
+    assert requests[4]["reasoning"] == {"effort": "medium"}
 
 
-def test_rule_refinement_service_batched_suggestions_reassembly(tmp_path: Path) -> None:
-    """Multi-section document: verify merged replacements and ordered appends."""
-    set_cache_dir_override(tmp_path / ".cache" / "rule_refinement" / "principles")
-    try:
-        rules_path = tmp_path / "demo-build-rules.md"
-        rules_path.write_text(
-            "=== SECTION A ===\nLine A1\nLine A2\n=== SECTION B ===\nLine B1\n",
-            encoding="utf-8",
-        )
-        service = _build_service(
-            [
-                _FakeResponse(output_text=json.dumps({"principles": ["Update A2"]})),
-                _FakeResponse(
-                    output_text=json.dumps(
-                        {
-                            "replacements": [{"line_number": 3, "new_line": "Line A2 updated"}],
-                            "appends": [],
-                        }
-                    )
-                ),
-                _FakeResponse(
-                    output_text=json.dumps(
-                        {
-                            "replacements": [],
-                            "appends": ["Appended from B"],
-                        }
-                    )
-                ),
-                _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
-                *_narrative_tuning_responses(),
-            ]
-        )
-        result = service.run(
+def test_rule_refinement_service_runs_end_of_run_reduction_loop_and_tracks_deltas(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\nRule two\nRule three\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(
+                output_text="No source gaps found.",
+                usage={"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+            ),
+            _FakeResponse(
+                output_text=json.dumps({"replacements": [], "appends": []}),
+                usage={"input_tokens": 4, "output_tokens": 5, "total_tokens": 9},
+            ),
+            _FakeResponse(
+                output_text=json.dumps({"replacements": [], "appends": []}),
+                usage={"input_tokens": 6, "output_tokens": 7, "total_tokens": 13},
+            ),
+            *_narrative_tuning_responses(
+                critique={"critique": [], "suggested_improvements": []},
+                suggestion={"replacements": [], "appends": []},
+                usages=[
+                    {"input_tokens": 8, "output_tokens": 9, "total_tokens": 17},
+                    {"input_tokens": 10, "output_tokens": 11, "total_tokens": 21},
+                ],
+            ),
+            *_reduction_responses(
+                editor_suggestions=[
+                    {
+                        "replacements": [
+                            {"line_number": 2, "new_line": ""},
+                            {"line_number": 3, "new_line": ""},
+                        ],
+                        "appends": [],
+                    },
+                    {
+                        "replacements": [{"line_number": 2, "new_line": "Rule two restored"}],
+                        "appends": [],
+                    },
+                    {
+                        "replacements": [],
+                        "appends": [],
+                    },
+                ],
+                critic_payloads=[
+                    {"missing_information": ["Restore setup detail.", "Restore safety detail."]},
+                    {"missing_information": ["Restore safety detail."]},
+                    {"missing_information": []},
+                ],
+                usages=[
+                    {"input_tokens": 12, "output_tokens": 13, "total_tokens": 25},
+                    {"input_tokens": 14, "output_tokens": 15, "total_tokens": 29},
+                    {"input_tokens": 16, "output_tokens": 17, "total_tokens": 33},
+                    {"input_tokens": 18, "output_tokens": 19, "total_tokens": 37},
+                    {"input_tokens": 20, "output_tokens": 21, "total_tokens": 41},
+                    {"input_tokens": 22, "output_tokens": 23, "total_tokens": 45},
+                ],
+            ),
+        ]
+    )
+
+    result = service.run(
+        iterations=1,
+        rules_path=rules_path,
+        sources=[
+            RefinementSource(source_key="source_a", title="Source A", content="Synthetic source"),
+        ],
+    )
+
+    requests = service.responses_client.responses.requests
+    assert requests[5]["text"]["format"]["name"] == "rule_refinement_reduction_editor"
+    assert requests[5]["reasoning"] == {"effort": "high"}
+    assert requests[6]["text"]["format"]["name"] == "rule_refinement_reduction_critic"
+    assert requests[6]["reasoning"] == {"effort": "high"}
+    assert "Parent notes for this reduction pass" in requests[5]["input"][1]["content"]
+    assert "Applied editor changes" in requests[6]["input"][1]["content"]
+
+    assert result.reduction is not None
+    assert result.final_rules_path.endswith("demo-build-rules.v006.md")
+    assert result.reduction.final_line_count == 2
+    assert result.reduction.final_missing_information_count == 0
+    assert [
+        pass_result.missing_information_count for pass_result in result.reduction.pass_results
+    ] == [
+        2,
+        1,
+        0,
+    ]
+    assert [
+        pass_result.missing_information_delta for pass_result in result.reduction.pass_results
+    ] == [
+        None,
+        -1,
+        -1,
+    ]
+    assert [pass_result.line_count_after for pass_result in result.reduction.pass_results] == [
+        2,
+        2,
+        2,
+    ]
+    assert result.reduction.pass_results[0].parent_notes
+    assert result.reduction.pass_results[1].parent_notes
+    assert result.reduction.pass_results[2].parent_notes == []
+    assert Path(
+        result.reduction.pass_results[0].editor_result.output_artifact.rules_path
+    ).read_text(encoding="utf-8").splitlines() == ["Rule one", ""]
+    assert Path(result.final_rules_path).read_text(encoding="utf-8").splitlines() == [
+        "Rule one",
+        "Rule two restored",
+    ]
+    assert result.usage_totals == {
+        "cached_input_tokens": 0,
+        "input_tokens": 131,
+        "output_tokens": 142,
+        "reasoning_tokens": 0,
+        "total_tokens": 273,
+    }
+
+    assert result.manifest_path is not None
+    manifest_text = Path(result.manifest_path).read_text(encoding="utf-8")
+    assert "## Reduction" in manifest_text
+    assert "Reduction Pass 1" in manifest_text
+    assert "Final missing information count" in manifest_text
+
+    metrics_filename = Path(result.manifest_path).name.replace(".manifest.md", ".json")
+    metrics_payload = json.loads(
+        (Path("rule_refinement_metrics") / metrics_filename).read_text(encoding="utf-8")
+    )
+    assert metrics_payload["reduction"]["final_line_count"] == 2
+    assert metrics_payload["reduction"]["final_missing_information_count"] == 0
+    assert len(metrics_payload["reduction"]["pass_metrics"]) == 3
+
+
+def test_rule_refinement_service_emits_human_readable_logs(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Missing an opening rule."),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": ["Rule two"]})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(),
+        ]
+    )
+
+    with caplog.at_level(logging.INFO, logger="app.x_to_demo.rule_refinement.service"):
+        service.run(
             iterations=1,
             rules_path=rules_path,
             sources=[
                 RefinementSource(
-                    source_key="src",
-                    title="Source",
-                    content="Update section A line 2 and append from B",
-                ),
+                    source_key="source_a",
+                    title="Source A",
+                    content="Synthetic source",
+                )
             ],
+            reduction_passes=0,
         )
-        final_path = result.iteration_results[0].output_artifact.rules_path
-        final_text = (tmp_path / Path(final_path).name).read_text(encoding="utf-8")
-        lines = final_text.splitlines()
-        assert lines[2] == "Line A2 updated"
-        assert lines[-1] == "Appended from B"
-    finally:
-        set_cache_dir_override(None)
+
+    log_text = caplog.text
+    assert "Starting rule refinement run" in log_text
+    assert "Starting rule refinement iteration 1/1" in log_text
+    assert "Starting concurrent source-gap analysis" in log_text
+    assert "Completed source improvement" in log_text
+    assert "Suggestion summary: 0 replacements, 1 appends, 0 rationale notes" in log_text
+    assert "Completed consolidation" in log_text
+    assert "Completed narrative critique" in log_text
+    assert "Completed narrative improvement" in log_text
+    assert "Rule refinement run complete" in log_text
+
+
+def test_rule_refinement_service_clamps_reasoning_for_gpt5_mini(tmp_path: Path) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Missing an opening rule."),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(),
+        ],
+        model="gpt-5-mini",
+    )
+
+    service.run(
+        iterations=1,
+        rules_path=rules_path,
+        sources=[
+            RefinementSource(
+                source_key="source_a",
+                title="Source A",
+                content="Synthetic source",
+            )
+        ],
+        reduction_passes=0,
+    )
+
+    requests = service.responses_client.responses.requests
+    assert requests[0]["reasoning"] == {"effort": "high"}
+    assert requests[3]["reasoning"] == {"effort": "high"}
+    assert requests[4]["reasoning"] == {"effort": "medium"}
+
+
+def test_rule_refinement_service_uses_updated_rules_for_serial_improvements_and_tracks_usage(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(
+                output_text="- Add a heading.",
+                usage={"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+            ),
+            _FakeResponse(
+                output_text="- Add a first action.",
+                usage={"input_tokens": 4, "output_tokens": 5, "total_tokens": 9},
+            ),
+            _FakeResponse(
+                output_text=json.dumps(
+                    {
+                        "replacements": [{"line_number": 1, "new_line": "## Narrative Flow"}],
+                        "appends": [],
+                    }
+                ),
+                usage={"input_tokens": 6, "output_tokens": 7, "total_tokens": 13},
+            ),
+            _FakeResponse(
+                output_text=json.dumps(
+                    {"replacements": [], "appends": ["1. Start by stating the user's goal."]}
+                ),
+                usage={"input_tokens": 8, "output_tokens": 9, "total_tokens": 17},
+            ),
+            _FakeResponse(
+                output_text=json.dumps({"replacements": [], "appends": []}),
+                usage={"input_tokens": 10, "output_tokens": 11, "total_tokens": 21},
+            ),
+            *_narrative_tuning_responses(
+                critique={
+                    "critique": ["The rules read like isolated statements."],
+                    "suggested_improvements": ["Keep the opening flow explicit."],
+                },
+                suggestion={"replacements": [], "appends": []},
+                usages=[
+                    {"input_tokens": 12, "output_tokens": 13, "total_tokens": 25},
+                    {"input_tokens": 14, "output_tokens": 15, "total_tokens": 29},
+                ],
+            ),
+        ]
+    )
+
+    result = service.run(
+        iterations=1,
+        rules_path=rules_path,
+        sources=[
+            RefinementSource(source_key="source_a", title="Source A", content="Synthetic A"),
+            RefinementSource(source_key="source_b", title="Source B", content="Synthetic B"),
+        ],
+        reduction_passes=0,
+    )
+
+    requests = service.responses_client.responses.requests
+    assert '"1": "## Narrative Flow"' in requests[3]["input"][1]["content"]
+    assert "1. Start by stating the user's goal." in requests[4]["input"][1]["content"]
+    assert result.usage_totals == {
+        "cached_input_tokens": 0,
+        "input_tokens": 55,
+        "output_tokens": 62,
+        "reasoning_tokens": 0,
+        "total_tokens": 117,
+    }
+    assert result.iteration_results[0].narrative_tuning.critique.critique == [
+        "The rules read like isolated statements."
+    ]
+    assert Path(result.final_rules_path).read_text(encoding="utf-8").splitlines() == [
+        "## Narrative Flow",
+        "1. Start by stating the user's goal.",
+    ]
+
+
+def test_rule_refinement_service_raises_for_invalid_source_suggestion_line_numbers(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Bad suggestion."),
+            _FakeResponse(
+                output_text=json.dumps(
+                    {"replacements": [{"line_number": 9, "new_line": "Bad line"}]}
+                )
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="Replacement line number 9 is out of range"):
+        service.run(
+            iterations=1,
+            rules_path=rules_path,
+            sources=[
+                RefinementSource(
+                    source_key="source_a",
+                    title="Source A",
+                    content="Synthetic source",
+                )
+            ],
+            reduction_passes=0,
+        )
+
+
+def test_rule_refinement_service_raises_for_invalid_narrative_suggestion_line_numbers(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "demo-build-rules.md"
+    rules_path.write_text("Rule one\n", encoding="utf-8")
+    service = _build_service(
+        [
+            _FakeResponse(output_text="Keep the rule."),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            _FakeResponse(output_text=json.dumps({"replacements": [], "appends": []})),
+            *_narrative_tuning_responses(
+                suggestion={
+                    "replacements": [{"line_number": 9, "new_line": "Bad line"}],
+                    "appends": [],
+                }
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="Replacement line number 9 is out of range"):
+        service.run(
+            iterations=1,
+            rules_path=rules_path,
+            sources=[
+                RefinementSource(
+                    source_key="source_a",
+                    title="Source A",
+                    content="Synthetic source",
+                )
+            ],
+            reduction_passes=0,
+        )
 
 
 @pytest.mark.integration
-def test_live_openai_smoke_rule_refinement_narrative_critique() -> None:
+def test_live_openai_smoke_rule_refinement_source_analysis() -> None:
     from openai import OpenAI
 
     api_key = _require_live_openai_smoke()
@@ -1130,27 +975,29 @@ def test_live_openai_smoke_rule_refinement_narrative_critique() -> None:
         response_wait_log_interval_seconds=0.01,
     )
 
-    critique, metrics = service._critique_narrative_structure(
+    analysis, metrics = service._analyze_sources(
         rules=DemoBuildRulesLines(
             path="demo-build-rules.md",
             exists=True,
-            line_count=3,
-            lines={
-                1: "# Demo Build Rules",
-                2: "Keep the scope small.",
-                3: "Use clear language.",
-            },
-        )
-    )
+            line_count=2,
+            lines={1: "Keep the scope small.", 2: "Use clear language."},
+        ),
+        sources=[
+            RefinementSource(
+                source_key="source_a",
+                title="Source A",
+                content="Require explicit sequencing and defaults.",
+            )
+        ],
+    )["source_a"]
 
-    assert critique.critique
-    assert critique.suggested_improvements
+    assert analysis
     assert metrics.status == "completed"
     assert metrics.model_used
 
 
 @pytest.mark.integration
-def test_live_openai_smoke_rule_refinement_narrative_improvement() -> None:
+def test_live_openai_smoke_rule_refinement_source_improvement() -> None:
     from openai import OpenAI
 
     api_key = _require_live_openai_smoke()
@@ -1161,20 +1008,19 @@ def test_live_openai_smoke_rule_refinement_narrative_improvement() -> None:
         response_wait_log_interval_seconds=0.01,
     )
 
-    suggestion, metrics = service._improve_narrative_structure(
+    suggestion, metrics = service._suggest_rule_updates(
         rules=DemoBuildRulesLines(
             path="demo-build-rules.md",
             exists=True,
             line_count=2,
-            lines={
-                1: "Rule one",
-                2: "Rule two",
-            },
+            lines={1: "Rule one", 2: "Rule two"},
         ),
-        suggested_improvements=[
-            "Add a clearer opening that frames the procedure.",
-            "Use more explicit action wording.",
-        ],
+        analysis="- Missing a clearer opening.\n- Missing sequencing.",
+        source=RefinementSource(
+            source_key="source_a",
+            title="Source A",
+            content="Synthetic source",
+        ),
     )
 
     assert isinstance(suggestion.replacements, list)

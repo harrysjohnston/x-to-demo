@@ -160,7 +160,11 @@ def extract_global_rules() -> str:
 
 
 def extract_phase_prompts(phase_key: PhaseKey | str) -> str:
-    """Return a descriptive summary of phase guidance without JSON payloads."""
+    """Return a descriptive summary of phase guidance without JSON payloads.
+
+    Excludes global rules; those are extracted separately as the global_rules source
+    to avoid duplication across phase extractions.
+    """
     phase = _get_phase(phase_key)
     if phase is None:
         return ""
@@ -175,9 +179,7 @@ def extract_phase_prompts(phase_key: PhaseKey | str) -> str:
         "",
         "### Developer Guidance",
         "",
-        "Global hard rules:",
     ]
-    lines.extend(f"{index}. {rule}" for index, rule in enumerate(_GLOBAL_HARD_RULES, start=1))
 
     if phase_rules:
         lines.extend(["", "Phase-specific rules:"])
