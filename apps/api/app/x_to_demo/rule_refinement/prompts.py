@@ -222,7 +222,7 @@ def build_reduction_editor_user_prompt(
         f"```json\n{line_mapping_json}\n```\n\n"
         "Reduce redundancy without losing information: every substantive requirement must remain represented. "
         "Keep distinct rules on distinct lines, and use empty-string replacements only for lines made redundant "
-        "by consolidation."
+        "by consolidation. Your aim is to reduce the rules to the smallest set that still captures the necessary guidance."
     )
 
 
