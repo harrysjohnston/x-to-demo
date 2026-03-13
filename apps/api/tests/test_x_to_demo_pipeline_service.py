@@ -504,10 +504,8 @@ def _code_spec_payload(feature_name: str = "Test Feature") -> dict[str, object]:
             },
         },
         "agent_skills_to_apply": [
-            "runtime-input-guardrails-server-side",
-            "synthetic-input-presets",
+            "demo-e2e",
             "canonical-spec-format-parity",
-            "generated-output-badge",
         ],
         "components": ["InputXEditor", "PhaseTimeline", "CodeSpecPanel"],
         "state_model": {"fields": ["xInput", "phaseStatus", "artifacts"]},
@@ -1292,7 +1290,7 @@ def test_render_code_spec_markdown_includes_runtime_guardrails_and_skill_section
     assert "#### Runtime Guardrails Plan" in markdown
     assert "- Preset inputs integration coverage:" in markdown
     assert "## Agent Skills To Apply" in markdown
-    assert "runtime-input-guardrails-server-side" in markdown
+    assert "demo-e2e" in markdown
 
 
 def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present() -> None:
@@ -1316,8 +1314,7 @@ def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present(
         "Iterate each preset through guardrails in mocked tests; optional live tier runs one preset."
     )
     payload["agent_skills_to_apply"] = [
-        "runtime-input-guardrails-server-side",
-        "synthetic-input-presets",
+        "demo-e2e",
         "canonical-spec-format-parity",
     ]
     artifact = CodeSpecArtifact.model_validate(payload)
@@ -1329,14 +1326,13 @@ def test_render_code_spec_markdown_renders_runtime_guardrails_plan_when_present(
     assert "- Relevance model call: responses:gpt-5.2" in markdown
     assert "- Safety model call: responses:gpt-5.2" in markdown
     assert "Iterate each preset through guardrails in mocked tests" in markdown
-    assert "- runtime-input-guardrails-server-side" in markdown
-    assert "- synthetic-input-presets" in markdown
+    assert "- demo-e2e" in markdown
 
 
 def test_code_spec_adds_multimodal_inputs_when_voice_required() -> None:
     """When covers_requires_voice is True, multimodal-inputs is added to agent_skills_to_apply."""
     payload = _code_spec_payload()
     payload["openai_integration"]["covers_requires_voice"] = True
-    payload["agent_skills_to_apply"] = ["runtime-input-guardrails-server-side"]
+    payload["agent_skills_to_apply"] = ["demo-e2e"]
     artifact = CodeSpecArtifact.model_validate(payload)
     assert "multimodal-inputs" in artifact.agent_skills_to_apply

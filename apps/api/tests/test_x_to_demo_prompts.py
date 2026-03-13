@@ -174,7 +174,7 @@ def test_build_phase_prompts_enforces_openai_api_selection_for_code_spec() -> No
         "Specify synthetic preset implementation where default selection/apply populates UI only and run requires explicit action."
         in user_prompt
     )
-    assert "Include agent_skills_to_apply with runtime-input-guardrails-server-side" in user_prompt
+    assert "Include agent_skills_to_apply with demo-e2e" in user_prompt
     assert "Include asset_generation_plan (API/model per modality" in user_prompt
     assert (
         "Include WalkthroughImplementation.state_machine_model with explicit states/transitions"

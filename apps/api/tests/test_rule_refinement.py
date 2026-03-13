@@ -184,7 +184,17 @@ def test_extract_refinement_inputs_aggregates_sources_in_stable_order() -> None:
     assert sources[1].source_key == "feature_spec_prompts"
     assert sources[2].source_key == "feature_spec_models"
     assert any(source.source_key == "code_spec_prompts" for source in sources)
-    assert any(source.source_key == "skill_demo-design-decisions" for source in sources)
+    assert any(source.source_key == "skill_demo-e2e" for source in sources)
+    assert not any(source.source_key == "skill_generated-output-badge" for source in sources)
+    assert not any(source.source_key == "skill_in-flight-loading-ui" for source in sources)
+    assert not any(source.source_key == "skill_openai-env-config" for source in sources)
+    assert not any(source.source_key == "skill_openai-model-defaults" for source in sources)
+    assert not any(source.source_key == "skill_openai-model-pricing" for source in sources)
+    assert not any(
+        source.source_key == "skill_runtime-input-guardrails-server-side" for source in sources
+    )
+    assert not any(source.source_key == "skill_synthetic-input-labeling" for source in sources)
+    assert not any(source.source_key == "skill_synthetic-input-presets" for source in sources)
     assert all(source.content for source in sources)
 
 
@@ -237,9 +247,17 @@ def test_extract_phase_models_returns_descriptive_model_sections() -> None:
 def test_extract_all_skills_discovers_current_skill_set() -> None:
     skills = extract_all_skills()
 
-    assert "demo-design-decisions" in skills
-    assert "generated-output-badge" in skills
-    assert "## Reference" in skills["generated-output-badge"]
+    assert "demo-e2e" in skills
+    assert "demo-design-decisions" not in skills
+    assert "generated-output-badge" not in skills
+    assert "in-flight-loading-ui" not in skills
+    assert "openai-env-config" not in skills
+    assert "openai-model-defaults" not in skills
+    assert "openai-model-pricing" not in skills
+    assert "runtime-input-guardrails-server-side" not in skills
+    assert "synthetic-input-labeling" not in skills
+    assert "synthetic-input-presets" not in skills
+    assert "## Reference" in skills["demo-e2e"]
 
 
 def test_developer_prompts_prepend_shared_objective() -> None:

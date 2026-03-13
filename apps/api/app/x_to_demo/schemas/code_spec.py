@@ -9,10 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .common import AcceptanceCriterion, ArtifactBase
 
 REQUIRED_AGENT_SKILLS_TO_APPLY: tuple[str, ...] = (
-    "runtime-input-guardrails-server-side",
-    "synthetic-input-presets",
+    "demo-e2e",
     "canonical-spec-format-parity",
-    "generated-output-badge",
     "openai-live-integration-tests",
 )
 
@@ -759,7 +757,7 @@ class CodeSpecArtifact(ArtifactBase):
         default_factory=lambda: list(REQUIRED_AGENT_SKILLS_TO_APPLY),
         min_length=1,
         description=(
-            "Skill slugs required for implementation. Must include guardrails, presets, format parity, and generated-output labeling."
+            "Skill slugs required for implementation. Must include the baseline demo skill, format parity, and live OpenAI test guidance."
         ),
     )
     components: list[str] = Field(

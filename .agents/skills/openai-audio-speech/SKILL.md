@@ -67,9 +67,7 @@ If none of those are true, keep the system on the simpler Audio API.
 ## Coordinate With Other Skills
 
 - Use `multimodal-inputs` when you modify microphone capture, playback, or upload UI.
-- Use `in-flight-loading-ui` when audio requests can take noticeable time.
-- Use `openai-env-config` when you add or change OpenAI credential loading.
-- Use `openai-model-defaults` when you add centralized model configuration.
+- Use `demo-e2e` when you need this repo's baseline demo guidance for async audio UX, generated-media labeling, or shared OpenAI config conventions.
 - Use `openai-live-integration-tests` when you add real OpenAI audio calls that need opt-in live coverage.
 
 ## Read The Reference

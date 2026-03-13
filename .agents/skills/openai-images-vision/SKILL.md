@@ -55,9 +55,7 @@ Implement OpenAI image generation and image-understanding flows without re-deriv
 ## Coordinate With Other Skills
 
 - Use `multimodal-inputs` when you touch upload, camera, or image preview UI.
-- Use `openai-env-config` when you add or change OpenAI credential loading.
-- Use `openai-model-defaults` when you add model configuration or overrides.
-- Use `generated-output-badge` when generated images or AI-derived captions appear in UI.
+- Use `demo-e2e` when you need this repo's baseline demo guidance for generated-media labeling or shared OpenAI config conventions.
 
 ## Read The Reference
 
