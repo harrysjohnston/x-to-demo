@@ -6,12 +6,17 @@ Default to markdown outputs that are useful to build, review, and test the demo.
 
 Produce one concise markdown doc or section set covering the relevant items below.
 
+This minimum output shape is the demo contract for the work: the behavior-first spec the implementation should realize.
+
 ## Overview
 
 - demo name or working title
 - one-sentence purpose
-- chosen profile and active modules
+- primary profile
+- additional demo modules, if any
 - explicit scope boundary
+
+Primary profile should name the closest operating profile: `baseline`, `tools`, `multimodal`, or `assets`.
 
 ## Headline Demo Items
 
@@ -19,11 +24,19 @@ Produce one concise markdown doc or section set covering the relevant items belo
 - stable ids when they help traceability
 - user-visible proof for each item
 
+Each headline item should be one top-level user-visible capability or scenario the demo is intended to prove.
+
+User-visible proof should state what an observer can see in the demo that proves the item works.
+
 ## Core Flow
 
 - primary user journey from initial state to successful outcome
 - entry point, execution point, and success signals
 - declared out-of-scope or non-goals
+
+Entry point should state where the user starts. Execution point should state the control or event that triggers guardrails and the main flow.
+
+Success signals should be observable outcomes that show the flow reached its intended result.
 
 ## Views And Interactions
 
@@ -49,6 +62,8 @@ Produce one concise markdown doc or section set covering the relevant items belo
 - apply/run/reset behavior
 - any seeded datasets or seeded file examples
 
+Shipped presets are the presets intended to be available in the delivered demo.
+
 ## Guardrails And AI Behavior
 
 - deterministic validation summary
@@ -64,7 +79,7 @@ Produce one concise markdown doc or section set covering the relevant items belo
 - reusable UI indicators and labeling patterns
 - shared OpenAI config loader and model-default override point
 - pricing or cost-estimation note when model choice matters
-- required modules or remaining reusable skills
+- which additional demo modules are active and which external skills the work depends on
 - any local integration constraints
 
 ## Testing Expectations
@@ -83,11 +98,19 @@ Produce one concise markdown doc or section set covering the relevant items belo
 - choices that need user confirmation
 - intentionally deferred work within scope
 
-## Optional Module Sections
+## Additional Module Sections
 
-Add these only when relevant:
+Add these only when the corresponding additional demo modules are active:
 
 - tooling plan
 - multimodal capture and validation plan
 - required synthetic assets inventory
-- long-running execution notes
+
+## Execution Tracking
+
+Add this only when full long-running tracking is required for the work:
+
+- task contract with done criteria and milestones
+- worklog or latest checkpoint summary
+- per-milestone verification notes
+- closeout or cleanup notes when relevant

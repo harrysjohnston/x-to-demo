@@ -7,10 +7,10 @@ Apply to every demo E2E unless the user is asking for something narrower than a 
 ## Responsibilities
 
 - Define the smallest honest demo scope and explicit non-goals.
-- Produce the core flow, views, interactions, walkthrough, presets, guardrails summary, AI seam notes, and proof plan.
-- Apply the baseline demo decisions directly: server-side guardrails only, one relevance and one safety verdict, global selectable presets, and preset-backed integration proof.
+- Produce the core flow, views, interactions, walkthrough, presets, guardrails summary, AI seam notes, and testing expectations.
+- Apply the baseline demo decisions directly: server-side guardrails only, one relevance and one safety verdict, global selectable presets, and mocked integration coverage proving shipped presets can reach their intended demo flows.
 - Keep generated-output labeling, synthetic-input labeling, async UX, OpenAI config, model defaults, and cost awareness in view from the start rather than bolting them on later.
-- Ensure the demo is browser-compatible and reviewable in both themes when a UI exists.
+- Ensure the demo is browser-compatible and appears and operates correctly in both light and dark themes when a UI exists.
 
 ## Required Outputs Or Checks
 

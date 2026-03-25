@@ -4,7 +4,7 @@ These guarantees apply broadly across demo E2E work. Keep them short here and us
 
 ## Scope Discipline
 
-- Keep the demo scoped to the smallest credible proof, usually one to three headline demo items.
+- Keep the demo scoped to the smallest honest demo, usually one to three headline demo items.
 - Do not add new product scope while moving from concept to implementation.
 - Carry exclusions forward explicitly so plumbing does not re-enter later by accident.
 
@@ -15,6 +15,8 @@ These guarantees apply broadly across demo E2E work. Keep them short here and us
 
 ## Presets And Seeded Inputs
 
+- The primary flow is the main user path that demonstrates the core demo value. The main input area is the input surface that starts that path.
+- Shipped presets are the presets intended to be available in the delivered demo, not temporary developer-only fixtures.
 - Presets are global, user-selectable demo controls, not hidden per-component fixtures.
 - The preset selector and its apply/run/reset controls belong in the main input area for the primary flow.
 - Presets are apply-only; execution requires an explicit run or submit action.
@@ -22,7 +24,7 @@ These guarantees apply broadly across demo E2E work. Keep them short here and us
 - Presets must never auto-run on load, navigation, or preset selection.
 - Shipped presets require mocked-by-default integration coverage before they are treated as done.
 - Live preset validation is optional and opt-in unless the demo explicitly requires more.
-- Presets and other seeded inputs remain synthetic and reviewable, not hidden runtime state.
+- Presets and other seeded inputs remain synthetic and human-inspectable, not hidden runtime state.
 
 ## Walkthrough Behavior
 
@@ -41,6 +43,7 @@ These guarantees apply broadly across demo E2E work. Keep them short here and us
 
 ## AI Seam Validation
 
+- The AI seam is the boundary where the demo forms an OpenAI or tool request, then parses, validates, and normalizes the response into app state.
 - Validate requests before sending them.
 - Parse and validate structured responses before turning them into app state.
 - Failures at the AI seam must be visible, retryable, and testable.
@@ -78,7 +81,7 @@ These guarantees apply broadly across demo E2E work. Keep them short here and us
 ## Browser And Theme Defaults
 
 - Browser-compatible UI is the default posture for demos with a UI.
-- Light and dark themes should remain usable and testable unless the demo explicitly has no theme concept.
+- Light and dark themes should render and behave correctly unless the demo explicitly has no theme concept.
 
 ## Privacy-Safe Debugging
 

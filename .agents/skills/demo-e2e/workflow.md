@@ -4,31 +4,46 @@ Use this workflow to turn rough demo intent into a buildable, testable demo with
 
 ## 1. Start From The Smallest Honest Demo
 
+The smallest honest demo is the smallest scope that still proves the claimed user-visible AI value without hiding essential behavior behind vague promises.
+
 - Resolve the user request into one to three headline demo items.
 - Keep the demo AI-first: each headline item should prove a concrete AI value, not just generic app plumbing.
 - State what is intentionally out of scope. Do not smuggle in auth, billing, analytics, CI/CD, admin surfaces, or other plumbing unless the demo cannot be shown without them.
 
 If the request is underspecified, narrow the scope and record TODOs or open questions instead of guessing.
 
-## 2. Choose The Demo Profile Early
+## 2. Choose One Primary Profile And Any Additional Demo Modules
 
-Pick the closest operating profile up front:
+Pick exactly one primary operating profile up front:
 
 - baseline: text-first demo with no tools, no multimodal input, no required synthetic assets beyond normal presets
 - tools: at least one headline item truly needs tool use or iterative planning
 - multimodal: audio or image input/output is part of the core demo
 - assets: the demo needs project-owned synthetic text, image, audio, or seeded datasets as named assets
-- long-running: the implementation work itself needs checkpoints and bounded retries
 
-Only activate the extra modules that the chosen profile actually needs.
+Baseline obligations always apply. Then add any additional demo modules that the same demo also needs.
+
+When the primary profile is `tools`, `multimodal`, or `assets`, the matching additional demo module should be listed as active unless the demo explicitly justifies leaving it inactive.
+
+Additional demo modules are composable. More than one additional demo module may be active at the same time.
+
+Long-running execution practices always apply to the work process. They are not a primary profile or a demo module.
+
+Examples:
+
+1. primary profile: baseline; additional demo modules: none
+2. primary profile: tools; additional demo modules: tools, assets
+3. primary profile: multimodal; additional demo modules: multimodal, assets
 
 ## 3. Derive The Core Flow
 
 Think in three passes:
 
+A headline demo item is one top-level user-visible capability or scenario the demo is meant to prove.
+
 1. boundary: define the headline items, success signals, assumptions, and exclusions
-2. contract: define the user-facing flow, views, interactions, walkthrough, presets, and guardrails behavior
-3. proof: define implementation notes, AI seams, test coverage, and any local implementation constraints
+2. contract: define the user-facing behavior the output must specify, including the flow, views, interactions, walkthrough, presets, and guardrails behavior
+3. implementation: define implementation notes, AI seams, test coverage, and any local implementation constraints
 
 Each pass should sharpen the same demo, not expand it.
 

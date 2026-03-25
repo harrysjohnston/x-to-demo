@@ -205,7 +205,7 @@ Never log raw prompts, raw model outputs, API keys, or sensitive user payloads. 
 
 ### Storage Rules
 
-- Store presets in project-owned, reviewable files.
+- Store presets in project-owned, human-inspectable files such as text, JSON, images, or other format-appropriate files that a reviewer can open directly.
 - Use one canonical preset collection per feature.
 - Keep stable `preset_id` values and deterministic field ordering.
 - Keep preset content explicitly labeled as synthetic or example data.
